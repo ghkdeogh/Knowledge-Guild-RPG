@@ -22,6 +22,7 @@ if (!app.includes('guild-prompt-dock') || !app.includes("/api/repository-status"
 if (!app.includes('RepositoryBark') || !app.includes('RepositoryChanges') || !app.includes('confirmSeen') || app.includes('checkRepository().then(markSeen)')) throw new Error('Repository bark/change panel or explicit seen confirmation contract is missing')
 if (!app.includes('project-change-action') || !css.includes('.project-change-action')) throw new Error('Mobile project-only repository changes have no compact action')
 if (!app.includes("const memberId = member?.id || null") || !app.includes("'선택된 member 공개 Wiki 경로'")) throw new Error('Repository changes panel is not safe when its member record is unavailable')
+if (!app.includes('changesReturnFocus') || !app.includes('const closeChanges')) throw new Error('Repository changes panel does not restore the triggering focus target')
 if (!app.includes('members/{member.id}/wiki/') || !app.includes('detail.readiness')) throw new Error('Scoped character action or non-executable skill disclosure is missing')
 if (!css.includes('.pose-crafting') || !css.includes('.pose-notice') || !css.includes('.guild-prompt-dock')) throw new Error('Repository pose or dock styles are missing')
 if (!css.includes('.repository-bark') || !css.includes('@media(prefers-reduced-motion:no-preference)')) throw new Error('Repository bark or reduced-motion visual guard is missing')

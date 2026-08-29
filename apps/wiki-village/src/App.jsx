@@ -275,12 +275,15 @@ function App() {
   const [seenNews, setSeenNews] = useState(() => { try { const value = JSON.parse(localStorage.getItem('knowledge-guild-seen-news') || '{}'); return value && typeof value === 'object' && !Array.isArray(value) ? value : {} } catch { return {} } })
   const [dismissedBarks, setDismissedBarks] = useState({})
   const [changesScope, setChangesScope] = useState(null)
+  const changesReturnFocus = useRef(null)
   const [showSkills, setShowSkills] = useState(false); const [skillDetail, setSkillDetail] = useState(null); const [skillScope, setSkillScope] = useState({ scope: 'project', memberId: null })
   const [onboardingState, setOnboardingState] = useState(() => ({ persistenceMode: 'local-writable', phase: snapshot.projectState === 'VILLAGE_READY' ? 'VILLAGE_READY' : snapshot.projectState === 'PROJECT_READY' ? 'MEMBER_ONBOARDING' : 'PROJECT_UNINITIALIZED' }))
   const openMember = snapshot.members.find(member => member.id === openMemberId) || null
   const selectedMember = snapshot.members.find(member => member.id === selectedMemberId) || null
   const checkRepository = async () => { try { const response = await fetch('/api/repository-status', { method: 'POST' }); const result = await response.json(); setRepository(result); setDismissedBarks({}); return result } catch { const result = { mode: 'error', message: '저장소 상태를 확인할 수 없습니다.', project: {} }; setRepository(result); return result } }
-  const confirmSeen = memberId => { const next = confirmMemberSeen(seenNews, memberId, repository); setSeenNews(next); localStorage.setItem('knowledge-guild-seen-news', JSON.stringify(next)); setChangesScope(null) }
+  const openChanges = (scope, memberId = null) => { changesReturnFocus.current = document.activeElement; setChangesScope({ scope, memberId }) }
+  const closeChanges = () => { setChangesScope(null); window.setTimeout(() => changesReturnFocus.current?.focus?.(), 0) }
+  const confirmSeen = memberId => { const next = confirmMemberSeen(seenNews, memberId, repository); setSeenNews(next); try { localStorage.setItem('knowledge-guild-seen-news', JSON.stringify(next)) } catch {} closeChanges() }
   const bark = selectRepositoryBark(snapshot.members, repository, seenNews, dismissedBarks)
 
   useEffect(() => {
@@ -295,17 +298,17 @@ function App() {
     <main className="village-app">
       <section className="village-map" aria-label="Knowledge Guild 마을">
         <VillageScenery />
-        <MissionBoard onAskProject={() => setAnswerTarget({ scope: 'project' })} onSkills={() => { setSkillScope({ scope: 'project', memberId: null }); setSkillDetail(null); setShowSkills(true) }} onRepositoryCheck={checkRepository} onChanges={() => setChangesScope({ scope: 'project' })} repository={repository} />
+        <MissionBoard onAskProject={() => setAnswerTarget({ scope: 'project' })} onSkills={() => { setSkillScope({ scope: 'project', memberId: null }); setSkillDetail(null); setShowSkills(true) }} onRepositoryCheck={checkRepository} onChanges={() => openChanges('project')} repository={repository} />
         {snapshot.members.map((member, index) => (
-          <MemberHome key={member.id} member={member} index={index} pose={poseFor(member, repository, seenNews)} bark={bark?.member.id === member.id ? bark : null} onBarkOpen={() => setChangesScope({ scope: 'member', memberId: member.id })} onBarkDismiss={() => setDismissedBarks(value => ({ ...value, [bark.key]: true }))} onEnter={() => setOpenMemberId(member.id)} onSelect={() => setSelectedMemberId(member.id)} />
+          <MemberHome key={member.id} member={member} index={index} pose={poseFor(member, repository, seenNews)} bark={bark?.member.id === member.id ? bark : null} onBarkOpen={() => openChanges('member', member.id)} onBarkDismiss={() => setDismissedBarks(value => ({ ...value, [bark.key]: true }))} onEnter={() => setOpenMemberId(member.id)} onSelect={() => setSelectedMemberId(member.id)} />
         ))}
         <div className="map-seal" aria-hidden="true"><b>KNOWLEDGE</b><span>GUILD</span></div>
       </section>
-      {selectedMember && <CharacterMenu member={selectedMember} onClose={() => setSelectedMemberId(null)} onAsk={() => { setAnswerTarget({ scope: 'personal', member: selectedMember }); setSelectedMemberId(null) }} onHome={() => { setOpenMemberId(selectedMember.id); setSelectedMemberId(null) }} onSkills={() => { setSkillScope({ scope: 'member', memberId: selectedMember.id }); setSkillDetail(null); setShowSkills(true); setSelectedMemberId(null) }} onChanges={() => { setChangesScope({ scope: 'member', memberId: selectedMember.id }); setSelectedMemberId(null) }} />}
+      {selectedMember && <CharacterMenu member={selectedMember} onClose={() => setSelectedMemberId(null)} onAsk={() => { setAnswerTarget({ scope: 'personal', member: selectedMember }); setSelectedMemberId(null) }} onHome={() => { setOpenMemberId(selectedMember.id); setSelectedMemberId(null) }} onSkills={() => { setSkillScope({ scope: 'member', memberId: selectedMember.id }); setSkillDetail(null); setShowSkills(true); setSelectedMemberId(null) }} onChanges={() => { openChanges('member', selectedMember.id); setSelectedMemberId(null) }} />}
       {openMember && <HouseInterior key={openMember.id} member={openMember} onClose={() => setOpenMemberId(null)} onAsk={member => { setOpenMemberId(null); setAnswerTarget({ scope: 'personal', member }) }} />}
       <AnswerPanel key={`${answerTarget.scope}-${answerTarget.member?.id || 'project'}`} target={answerTarget} docked onClose={() => setAnswerTarget({ scope: 'project' })} />
       {showSkills && <SkillStation skills={(snapshot.skills || []).filter(skill => skillScope.scope === 'member' ? skill.memberId === skillScope.memberId : skill.scope === 'project')} detail={skillDetail} onDetail={setSkillDetail} onClose={() => { setShowSkills(false); setSkillDetail(null) }} />}
-      {changesScope && <RepositoryChanges repository={repository} scope={changesScope.scope} member={snapshot.members.find(member => member.id === changesScope.memberId)} seenNews={seenNews} onConfirm={() => confirmSeen(changesScope.memberId)} onClose={() => setChangesScope(null)} />}
+      {changesScope && <RepositoryChanges repository={repository} scope={changesScope.scope} member={snapshot.members.find(member => member.id === changesScope.memberId)} seenNews={seenNews} onConfirm={() => confirmSeen(changesScope.memberId)} onClose={closeChanges} />}
       <p className="sr-only" aria-live="polite">{openMember ? `${openMember.displayName}의 Wiki 집 내부` : '길드 마을'}</p>
     </main>
   )
