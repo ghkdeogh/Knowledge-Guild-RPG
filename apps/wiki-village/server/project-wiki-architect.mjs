@@ -157,7 +157,7 @@ export function renderProjectFiles(blueprint) {
 export function renderMemberFiles(identity, blueprint) {
   const safeIdentity = validateIdentity(identity); const safe = sanitizeBlueprint(blueprint)
   const metadata = `schema: ${architectSchema}\nmemberId: ${safeIdentity.memberId}\nknowledgeType: personal-opinion\n`
-  return {
+  const files = {
     'CONTEXT.md': `---\n${metadata}---\n\n# Member Context\n\n## Display name\n\n${safeIdentity.displayName}\n\n## Approved working context\n\n${safeIdentity.workingContext}\n`,
     'WIKI_SCHEMA.md': `---\nschema: ${architectSchema}\nmemberId: ${safeIdentity.memberId}\nknowledgeType: wiki-record\n---\n\n# Personal Wiki Schema\n\n개인 의견은 personal-opinion으로, 공통 사실은 projects/에 분리합니다.\n`,
     'raw/README.md': '# Raw source layer\n\n명시적 ingest 승인 전에는 사용자 원문을 저장하지 않습니다.\n',
