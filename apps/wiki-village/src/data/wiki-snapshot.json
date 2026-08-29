@@ -1,8 +1,8 @@
 {
-  "version": 4,
+  "version": 5,
   "projectState": "PROJECT_UNINITIALIZED",
   "generatedAt": "onboarding-state",
-  "boundary": "WIKI SNAPSHOT · server-side onboarding persistence only · no browser filesystem access",
+  "boundary": "WIKI SNAPSHOT · compiled wiki records only · no raw/output/private/secrets",
   "decisionState": "Official decisions are represented only by decisions/ documents.",
   "manifest": {
     "version": 1,

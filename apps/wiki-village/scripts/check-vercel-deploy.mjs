@@ -2,6 +2,7 @@ import { EventEmitter } from 'node:events'
 import { readdir, readFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { localDraft } from '../server/project-wiki-architect.mjs'
 
 const appRoot = resolve(fileURLToPath(new URL('..', import.meta.url))); const evidence = JSON.parse(await readFile(join(appRoot, 'server', 'wiki-evidence.json'), 'utf8'))
 if (evidence.version < 4 || evidence.manifest.recordCount !== 0 || evidence.documents.length) throw new Error('Uninitialized server evidence artifact is invalid')
@@ -14,5 +15,6 @@ const { default: chat } = await import('../../../api/wiki-chat.mjs'); const chat
 if (chatResponse.status !== 200 || chatBody.mode !== 'unsupported' || chatBody.citations.length) throw new Error('Vercel chat did not preserve uninitialized refusal')
 const { default: onboarding } = await import('../../../api/onboarding.mjs'); const stateResponse = await invoke(onboarding, 'GET', '/api/onboarding-state'); const state = JSON.parse(stateResponse.payload)
 if (stateResponse.status !== 200 || state.persistenceMode !== 'read-only-demo' || state.phase !== 'PROJECT_UNINITIALIZED') throw new Error('Vercel onboarding state is not explicitly read-only')
-const saveResponse = await invoke(onboarding, 'POST', '/api/onboarding', JSON.stringify({ action: 'save-project', project: { projectName: 'x', summary: 'x', problem: 'x', audience: 'x', outcome: 'x' }, expectedDigest: 'x' })); if (saveResponse.status !== 403 || JSON.parse(saveResponse.payload).code !== 'read-only') throw new Error('Vercel onboarding accepted a persistent write')
+const draft = localDraft('기술 학습 결과를 팀과 정리하려는 프로젝트입니다.'); const identity = { memberId: 'deploy-check', displayName: '배포 확인', workingContext: '읽기 전용 blueprint preview를 확인합니다.' }; const previewResponse = await invoke(onboarding, 'POST', '/api/onboarding', JSON.stringify({ action: 'preview-blueprint', blueprint: draft.blueprint, identity })); const previewBody = JSON.parse(previewResponse.payload); if (previewResponse.status !== 200 || !previewBody.preview?.digest) throw new Error('Vercel onboarding did not allow blueprint preview')
+const saveResponse = await invoke(onboarding, 'POST', '/api/onboarding', JSON.stringify({ action: 'save-blueprint', blueprint: draft.blueprint, identity, expectedDigest: previewBody.preview.digest })); if (saveResponse.status !== 403 || JSON.parse(saveResponse.payload).code !== 'read-only') throw new Error('Vercel onboarding accepted a persistent write')
 console.log('Validated uninitialized deployment artifacts, scoped chat refusal, and explicit read-only onboarding API.')

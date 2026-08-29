@@ -6,5 +6,5 @@ import { onboardingMiddleware } from './server/onboarding.mjs'
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const providerConfig = { apiKey: env.OPENAI_API_KEY, model: env.OPENAI_MODEL || 'gpt-5.6-terra', reasoningEffort: env.OPENAI_REASONING_EFFORT || 'low' }
-  return { plugins: [react(), { name: 'wiki-api', configureServer(server) { server.middlewares.use(onboardingMiddleware()); server.middlewares.use(wikiChatMiddleware(providerConfig)) } }] }
+  return { plugins: [react(), { name: 'wiki-api', configureServer(server) { server.middlewares.use(onboardingMiddleware({ providerConfig })); server.middlewares.use(wikiChatMiddleware(providerConfig)) } }] }
 })

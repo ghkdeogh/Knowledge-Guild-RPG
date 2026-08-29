@@ -8,7 +8,7 @@
       "includeFiles": "apps/wiki-village/{server/wiki-evidence.json,src/data/wiki-snapshot.json}"
     },
     "api/onboarding.mjs": {
-      "includeFiles": "apps/wiki-village/src/data/wiki-snapshot.json"
+      "includeFiles": "apps/wiki-village/{src/data/wiki-snapshot.json,core/wiki-architect.mjs,server/wiki-architect-application.mjs,server/project-wiki-architect.mjs}"
     }
   }
 }

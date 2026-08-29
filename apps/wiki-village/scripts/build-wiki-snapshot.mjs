@@ -4,98 +4,26 @@ import { createHash } from 'node:crypto'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { activityBand, inferGuildRole } from '../src/guild.js'
-import { parseMemberFiles, parseMemberContext, parseProjectContext } from '../server/onboarding.mjs'
+import { parseBlueprint, parseMemberContext, parseMemberFiles, parseProjectContext } from '../server/onboarding.mjs'
 
-const appRoot = resolve(fileURLToPath(new URL('..', import.meta.url)))
-const repoRoot = resolve(appRoot, '..', '..')
-const membersRoot = join(repoRoot, 'members')
-const output = join(appRoot, 'src', 'data', 'wiki-snapshot.json')
-const evidenceOutput = join(appRoot, 'server', 'wiki-evidence.json')
-const safeId = /^[a-z0-9-]+$/
-const ignored = new Set(['raw', 'output', 'private', 'secrets', '.obsidian', 'node_modules'])
-const knowledgeTypes = new Set(['fact', 'personal-opinion', 'hypothesis', 'wiki-record'])
-const within = (base, candidate) => candidate === base || candidate.startsWith(`${base}${sep}`)
-const digest = value => createHash('sha256').update(value).digest('hex')
-const source = absolute => relative(repoRoot, absolute).replaceAll('\\', '/')
-const field = (text, key) => text.match(new RegExp(`^${key}:\\s*(.+)$`, 'm'))?.[1]?.replace(/^['"]|['"]$/g, '')
-const title = (text, fallback) => field(text, 'title') || text.match(/^#\s+(.+)$/m)?.[1] || fallback
-const excerpt = text => text.replace(/^---[\s\S]*?---\s*/m, '').replace(/```[\s\S]*?```/g, '').replace(/[#>*`|]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 230)
-const documentId = (memberId, absolute) => `member-${memberId}-${source(absolute).replace(/[^a-z0-9]+/gi, '-').replace(/-+$/, '')}`
-const personalSource = (value, memberId) => new RegExp(`^members/${memberId}/(CONTEXT\\.md|WIKI_SCHEMA\\.md|wiki/.*\\.md)$`).test(value || '') && !/\.private\.md$|\/(raw|output|private|secrets|\.obsidian|node_modules)\//.test(value || '')
-const projectSource = value => value === 'projects/PROJECT_CONTEXT.md'
-const frontmatter = text => text.match(/^---\s*\n([\s\S]*?)\n---/)?.[1] || ''
-const knowledgeType = (text, scope) => {
-  const declared = ['knowledgeType', 'knowledge_type', 'knowledge-type'].map(key => field(frontmatter(text), key)).find(value => knowledgeTypes.has(value))
-  return declared || (scope === 'project' ? 'fact' : 'wiki-record')
-}
-const manifestFor = records => {
-  const content = records.map(record => ({ id: record.id, scope: record.scope, memberId: record.memberId || null, source: record.source, title: record.title, knowledgeType: record.knowledgeType, contentDigest: record.contentDigest })).sort((a, b) => a.id.localeCompare(b.id))
-  return { version: 1, recordCount: content.length, contentDigest: digest(JSON.stringify(content)) }
-}
-const projectState = value => value?.projectState || (value?.projectContext ? 'PROJECT_READY' : 'PROJECT_UNINITIALIZED')
-const validSnapshot = value => {
-  if (!value || !['PROJECT_UNINITIALIZED', 'PROJECT_READY', 'VILLAGE_READY'].includes(projectState(value)) || !Array.isArray(value.members) || !Array.isArray(value.documents)) return false
-  const ids = value.documents.map(item => item.id)
-  if (new Set(ids).size !== ids.length || JSON.stringify(value.manifest) !== JSON.stringify(manifestFor(value.documents))) return false
-  const projectDocs = value.documents.filter(item => item.scope === 'project')
-  const personalDocs = value.documents.filter(item => item.scope === 'personal')
-  const validSource = value.documents.every(item => item.id && item.title && knowledgeTypes.has(item.knowledgeType) && /^[a-f0-9]{64}$/.test(item.contentDigest || '') && (item.scope === 'project' ? projectSource(item.source) : item.scope === 'personal' && safeId.test(item.memberId || '') && personalSource(item.source, item.memberId)))
-  if (!validSource) return false
-  if (projectState(value) === 'PROJECT_UNINITIALIZED') return !value.projectContext && !projectDocs.length && !personalDocs.length && !value.members.length
-  if (projectDocs.length !== 1 || !value.projectContext || value.projectContext.source !== 'projects/PROJECT_CONTEXT.md') return false
-  const personalById = new Map(personalDocs.map(item => [item.id, item]))
-  const validMembers = value.members.every(member => safeId.test(member.id || '') && member.documentCount > 0 && Array.isArray(member.documentIds) && member.documentCount === member.documentIds.length && member.documentIds.every(id => personalById.get(id)?.memberId === member.id))
-  return validMembers && (projectState(value) === 'PROJECT_READY' ? !value.members.length && !personalDocs.length : value.members.length > 0 && personalDocs.length > 0)
-}
-const validEvidence = (value, snapshot) => {
-  if (!value || value.version < 4 || !Array.isArray(value.documents) || JSON.stringify(value.manifest) !== JSON.stringify(snapshot.manifest) || JSON.stringify(value.manifest) !== JSON.stringify(manifestFor(value.documents))) return false
-  const sourceOkay = value.documents.every(item => item.id && typeof item.body === 'string' && item.contentDigest === digest(item.body) && knowledgeTypes.has(item.knowledgeType) && (item.scope === 'project' ? projectSource(item.source) : item.scope === 'personal' && safeId.test(item.memberId || '') && personalSource(item.source, item.memberId)))
-  const snapshotIds = new Set(snapshot.documents.map(item => item.id)); const evidenceIds = new Set(value.documents.map(item => item.id))
-  return sourceOkay && snapshotIds.size === evidenceIds.size && [...snapshotIds].every(id => evidenceIds.has(id))
-}
-async function preserveCommittedArtifacts(reason) {
-  let savedSnapshot; let savedEvidence
-  try { savedSnapshot = JSON.parse(await readFile(output, 'utf8')); savedEvidence = JSON.parse(await readFile(evidenceOutput, 'utf8')) } catch { throw new Error(`Wiki sources are unavailable (${reason}) and no committed snapshot artifacts are present.`) }
-  if (!validSnapshot(savedSnapshot) || !validEvidence(savedEvidence, savedSnapshot)) throw new Error(`Wiki sources are unavailable (${reason}); refusing to publish invalid artifacts.`)
-  console.log(`Preserved committed Wiki snapshot (${projectState(savedSnapshot)}; ${reason}).`)
-}
-async function load(absolute) { const resolved = await realpath(absolute); if (!within(repoRoot, resolved)) return null; return { absolute: resolved, text: await readFile(resolved, 'utf8') } }
-async function walk(directory, out = []) { const root = await realpath(directory); for (const entry of (await readdir(directory, { withFileTypes: true })).sort((a, b) => a.name.localeCompare(b.name))) { if (entry.name.startsWith('.') || ignored.has(entry.name)) continue; const absolute = join(directory, entry.name); const stat = await lstat(absolute); if (stat.isSymbolicLink()) continue; if (stat.isDirectory()) await walk(absolute, out); if (stat.isFile() && entry.name.endsWith('.md') && !entry.name.endsWith('.private.md')) { const resolved = await realpath(absolute); if (within(root, resolved)) out.push(resolved) } } return out }
-async function publicActivity(memberId) { try { const date = (await new Promise((resolvePromise, reject) => execFile('git', ['log', '-1', '--format=%cI', '--', `members/${memberId}`], { cwd: repoRoot }, (error, stdout) => error ? reject(error) : resolvePromise(String(stdout).trim())))).slice(0, 10); return activityBand(/^\d{4}-\d{2}-\d{2}$/.test(date) ? date : null) } catch { return activityBand(null) } }
-async function member(memberId) {
-  const root = join(membersRoot, memberId); const wiki = join(root, 'wiki')
-  try {
-    const context = await readFile(join(root, 'CONTEXT.md'), 'utf8')
-    const schema = await readFile(join(root, 'WIKI_SCHEMA.md'), 'utf8')
-    const index = await readFile(join(wiki, 'index.md'), 'utf8')
-    if (!parseMemberFiles(context, schema, index, memberId)) return null
-  } catch { return null }
-  const files = []
-  for (const file of [join(root, 'CONTEXT.md'), join(root, 'WIKI_SCHEMA.md'), join(wiki, 'index.md')]) try { files.push(await load(file)) } catch {}
-  try { for (const file of await walk(wiki)) files.push(await load(file)) } catch {}
-  const unique = [...new Map(files.filter(Boolean).map(file => [file.absolute, file])).values()]
-  const documents = unique.map(file => ({ id: documentId(memberId, file.absolute), memberId, author: memberId, category: '개인 Wiki', scope: 'personal', source: source(file.absolute), title: title(file.text, memberId), updated: field(frontmatter(file.text), 'updated') || 'snapshot', status: 'onboarded', knowledgeType: knowledgeType(file.text, 'personal'), contentDigest: digest(file.text), excerpt: excerpt(file.text) }))
-  const evidence = unique.map(file => ({ id: documentId(memberId, file.absolute), memberId, scope: 'personal', source: source(file.absolute), title: title(file.text, memberId), knowledgeType: knowledgeType(file.text, 'personal'), contentDigest: digest(file.text), body: file.text }))
-  return { id: memberId, memberId, displayName: parseMemberContext(await readFile(join(root, 'CONTEXT.md'), 'utf8'), memberId).identity, documentIds: documents.map(document => document.id), documentCount: documents.length, role: inferGuildRole(documents), activity: await publicActivity(memberId), documents, evidence }
-}
+const appRoot = resolve(fileURLToPath(new URL('..', import.meta.url))); const repoRoot = resolve(appRoot, '..', '..'); const output = join(appRoot, 'src', 'data', 'wiki-snapshot.json'); const evidenceOutput = join(appRoot, 'server', 'wiki-evidence.json'); const membersRoot = join(repoRoot, 'members')
+const safeId = /^[a-z0-9-]+$/; const ignored = new Set(['raw', 'output', 'Output', 'private', 'secrets', '.obsidian', 'node_modules']); const types = new Set(['fact', 'personal-opinion', 'hypothesis', 'wiki-record']); const digest = value => createHash('sha256').update(value).digest('hex'); const within = (base, candidate) => candidate === base || candidate.startsWith(`${base}${sep}`); const source = path => relative(repoRoot, path).replaceAll('\\', '/')
+const front = text => text.match(/^---\s*\n([\s\S]*?)\n---/)?.[1] || ''; const field = (text, key) => text.match(new RegExp(`^${key}:\\s*(.+)$`, 'm'))?.[1]?.replace(/^['"]|['"]$/g, ''); const title = (text, fallback) => field(front(text), 'title') || text.match(/^#\s+(.+)$/m)?.[1] || fallback; const excerpt = text => text.replace(/^---[\s\S]*?---\s*/m, '').replace(/```[\s\S]*?```/g, '').replace(/[#>*`|]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 230); const knowledgeType = (text, scope) => { const value = field(front(text), 'knowledgeType'); return types.has(value) ? value : scope === 'project' ? 'wiki-record' : 'wiki-record' }
+const recordId = (scope, absolute) => `${scope}-${source(absolute).replace(/[^a-z0-9]+/gi, '-').replace(/-+$/, '')}`; const manifestFor = records => ({ version: 1, recordCount: records.length, contentDigest: digest(JSON.stringify(records.map(record => ({ id: record.id, scope: record.scope, memberId: record.memberId || null, source: record.source, title: record.title, knowledgeType: record.knowledgeType, contentDigest: record.contentDigest })).sort((a, b) => a.id.localeCompare(b.id)))) })
+const validArtifact = (snapshot, evidence) => snapshot && evidence && Array.isArray(snapshot.documents) && Array.isArray(evidence.documents) && JSON.stringify(snapshot.manifest) === JSON.stringify(evidence.manifest) && JSON.stringify(snapshot.manifest) === JSON.stringify(manifestFor(snapshot.documents)) && JSON.stringify(evidence.manifest) === JSON.stringify(manifestFor(evidence.documents)) && snapshot.documents.length === evidence.documents.length && snapshot.documents.every(item => { const record = evidence.documents.find(candidate => candidate.id === item.id); return record && record.scope === item.scope && record.memberId === item.memberId && record.source === item.source && record.title === item.title && record.knowledgeType === item.knowledgeType && record.contentDigest === item.contentDigest && /^[a-f0-9]{64}$/.test(item.contentDigest || '') && digest(record.body || '') === record.contentDigest })
+async function preserve(reason) { const [savedSnapshot, savedEvidence] = await Promise.all([readFile(output, 'utf8').then(JSON.parse), readFile(evidenceOutput, 'utf8').then(JSON.parse)]).catch(() => [null, null]); if (!validArtifact(savedSnapshot, savedEvidence)) throw new Error(`Wiki sources are unavailable (${reason}); refusing to publish invalid artifacts.`); console.log(`Preserved committed Wiki snapshot (${reason}).`) }
+async function load(file) { const absolute = await realpath(file); if (!within(repoRoot, absolute)) return null; return { absolute, text: await readFile(absolute, 'utf8') } }
+async function walk(directory, out = []) { let root; try { root = await realpath(directory) } catch { return out }; for (const entry of (await readdir(directory, { withFileTypes: true })).sort((a, b) => a.name.localeCompare(b.name))) { if (entry.name.startsWith('.') || ignored.has(entry.name)) continue; const absolute = join(directory, entry.name); const stat = await lstat(absolute); if (stat.isSymbolicLink()) continue; if (stat.isDirectory()) await walk(absolute, out); if (stat.isFile() && entry.name.endsWith('.md') && !entry.name.endsWith('.private.md')) { const resolved = await realpath(absolute); if (within(root, resolved)) out.push(resolved) } }; return out }
+const toDocument = (file, scope, memberId = null) => ({ id: recordId(memberId ? `member-${memberId}` : scope, file.absolute), scope, memberId, author: memberId || 'project', category: scope === 'project' ? '프로젝트 Wiki' : '개인 Wiki', source: source(file.absolute), title: title(file.text, memberId || 'Project Wiki'), updated: 'onboarding', status: 'onboarded', knowledgeType: knowledgeType(file.text, scope), contentDigest: digest(file.text), excerpt: excerpt(file.text), body: file.text })
+async function activity(memberId) { try { const date = (await new Promise((resolvePromise, reject) => execFile('git', ['log', '-1', '--format=%cI', '--', `members/${memberId}`], { cwd: repoRoot }, (error, stdout) => error ? reject(error) : resolvePromise(String(stdout).trim())))).slice(0, 10); return activityBand(/^\d{4}-\d{2}-\d{2}$/.test(date) ? date : null) } catch { return activityBand(null) } }
+const allowedWikiPaths = blueprint => new Set(['index.md', ...blueprint.pageTypes.map(item => item.route.slice(5))])
+const approvedWikiFiles = async (wiki, blueprint) => (await walk(wiki)).filter(file => allowedWikiPaths(blueprint).has(relative(wiki, file).replaceAll('\\', '/')))
+async function member(memberId, blueprint) { const root = join(membersRoot, memberId); const wiki = join(root, 'wiki'); try { const [context, schema, index] = await Promise.all([readFile(join(root, 'CONTEXT.md'), 'utf8'), readFile(join(root, 'WIKI_SCHEMA.md'), 'utf8'), readFile(join(wiki, 'index.md'), 'utf8')]); if (!parseMemberFiles(context, schema, index, memberId)) return null; const files = (await Promise.all([join(root, 'CONTEXT.md'), join(root, 'WIKI_SCHEMA.md'), ...(await approvedWikiFiles(wiki, blueprint, memberId))].map(file => load(file)))).filter(Boolean); const documents = files.map(file => toDocument(file, 'personal', memberId)); return { id: memberId, memberId, displayName: parseMemberContext(context, memberId).displayName, documentIds: documents.map(item => item.id), documentCount: documents.length, role: inferGuildRole(documents), activity: await activity(memberId), documents } } catch { return null } }
 
-const remoteBuild = process.env.VERCEL === '1' || process.env.WIKI_VILLAGE_SIMULATE_SOURCE_MISSING === '1'
-let sourceMissing = process.env.WIKI_VILLAGE_SIMULATE_SOURCE_MISSING === '1'
-let project = null
-let projectText = ''
-if (!sourceMissing) try { projectText = await readFile(join(repoRoot, 'projects', 'PROJECT_CONTEXT.md'), 'utf8'); project = parseProjectContext(projectText) } catch {}
-let entries = []
-if (!sourceMissing && project) try { entries = (await readdir(membersRoot, { withFileTypes: true })).filter(entry => entry.isDirectory() && entry.name !== 'example-member' && safeId.test(entry.name)).sort((a, b) => a.name.localeCompare(b.name)) } catch (error) { if (error?.code === 'ENOENT') sourceMissing = true; else throw error }
-if (sourceMissing) { await preserveCommittedArtifacts('source root missing'); process.exit(0) }
-const indexed = project ? (await Promise.all(entries.map(entry => member(entry.name)))).filter(Boolean) : []
-const projectDocument = project ? (() => { const body = projectText; const contentDigest = digest(body); return { id: 'project-context', category: '프로젝트 공통 사실', scope: 'project', author: 'project', source: 'projects/PROJECT_CONTEXT.md', title: project.projectName, updated: 'onboarding', status: 'onboarded', knowledgeType: 'fact', contentDigest, excerpt: excerpt(body), body } })() : null
-const documents = [...(projectDocument ? [((({ body, ...document }) => document)(projectDocument))] : []), ...indexed.flatMap(item => item.documents)]
-const evidenceDocuments = [...(projectDocument ? [projectDocument] : []), ...indexed.flatMap(item => item.evidence)]
-const manifest = manifestFor(documents)
-const state = !project ? 'PROJECT_UNINITIALIZED' : indexed.length ? 'VILLAGE_READY' : 'PROJECT_READY'
-const projectContext = project ? { scope: 'project', source: 'projects/PROJECT_CONTEXT.md', title: project.projectName, goal: project.outcome, coreQuestion: project.problem, expansion: project.summary, status: 'onboarded', flow: ['프로젝트 인터뷰', 'Guild hall', '근거 확인'] } : null
-const snapshot = { version: 4, projectState: state, generatedAt: 'onboarding-state', boundary: 'WIKI SNAPSHOT · server-side onboarding persistence only · no browser filesystem access', decisionState: 'Official decisions are represented only by decisions/ documents.', manifest, projectContext, members: indexed.map(({ documents: memberDocuments, evidence, ...item }) => item), documents }
-await mkdir(dirname(output), { recursive: true }); await mkdir(dirname(evidenceOutput), { recursive: true })
-await writeFile(output, `${JSON.stringify(snapshot, null, 2)}\n`)
-await writeFile(evidenceOutput, `${JSON.stringify({ version: 4, manifest, documents: evidenceDocuments.map(({ body, ...document }) => ({ ...document, body })) }, null, 2)}\n`)
-console.log(`Wrote ${relative(appRoot, output)} for ${state} with ${snapshot.members.length} members.`)
+const sourceMissing = process.env.WIKI_VILLAGE_SIMULATE_SOURCE_MISSING === '1'; if (process.env.VERCEL === '1' || sourceMissing) { await preserve('source root missing'); process.exit(0) }
+let project; let blueprint; let projectText = ''; try { projectText = await readFile(join(repoRoot, 'projects', 'PROJECT_CONTEXT.md'), 'utf8'); project = parseProjectContext(projectText); blueprint = parseBlueprint(await readFile(join(repoRoot, 'projects', 'WIKI_BLUEPRINT.md'), 'utf8')) } catch {}
+const projectFiles = project && blueprint ? (await Promise.all([join(repoRoot, 'projects', 'PROJECT_CONTEXT.md'), join(repoRoot, 'projects', 'WIKI_BLUEPRINT.md'), ...(await approvedWikiFiles(join(repoRoot, 'projects', 'wiki'), blueprint))].map(file => load(file)))).filter(Boolean) : []
+let entries = []; if (project) try { entries = (await readdir(membersRoot, { withFileTypes: true })).filter(entry => entry.isDirectory() && safeId.test(entry.name)).sort((a, b) => a.name.localeCompare(b.name)) } catch {}
+const members = project && blueprint ? (await Promise.all(entries.map(entry => member(entry.name, blueprint)))).filter(Boolean) : []; const projectDocuments = projectFiles.map(file => toDocument(file, 'project')); const evidenceDocuments = [...projectDocuments, ...members.flatMap(item => item.documents)]; const documents = evidenceDocuments.map(({ body, ...document }) => document)
+const manifest = manifestFor(documents); const state = !project ? 'PROJECT_UNINITIALIZED' : members.length ? 'VILLAGE_READY' : 'PROJECT_READY'; const snapshot = { version: 5, projectState: state, generatedAt: 'onboarding-state', boundary: 'WIKI SNAPSHOT · compiled wiki records only · no raw/output/private/secrets', decisionState: 'Official decisions are represented only by decisions/ documents.', manifest, projectContext: project ? { scope: 'project', source: 'projects/PROJECT_CONTEXT.md', title: project.projectName, goal: project.outcome, coreQuestion: project.purpose, expansion: project.target, status: 'onboarded', flow: ['interpreted brief', 'approved blueprint', 'compiled Wiki'] } : null, members: members.map(({ documents: memberDocuments, ...item }) => item), documents }
+await mkdir(dirname(output), { recursive: true }); await writeFile(output, `${JSON.stringify(snapshot, null, 2)}\n`); await writeFile(evidenceOutput, `${JSON.stringify({ version: 5, manifest, documents: evidenceDocuments }, null, 2)}\n`); console.log(`Wrote ${relative(appRoot, output)} for ${state} with ${members.length} members.`)

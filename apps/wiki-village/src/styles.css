@@ -1,5 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Gowun+Batang:wght@400;700&display=swap');
 
+.onboarding-card input{background:#fffbea;border:3px solid #725240;font:17px/1.5 var(--serif);min-height:44px;padding:12px;width:100%}.blueprint-editor{font:12px/1.45 ui-monospace,monospace!important;min-height:340px!important}.clarification{border:2px dashed #725240;margin:14px 0;padding:12px}.clarification p{margin:0 0 8px}
+
 :root{--ink:#20352e;--cream:#fff5d6;--wood:#9a5c3f;--wood-dark:#4c302b;--grass:#83bd69;--grass-dark:#4b8c55;--path:#d9bd7d;--pixel:"DM Mono",monospace;--serif:"Gowun Batang",serif;color:var(--ink);font-family:var(--serif);font-synthesis:none}
 *{box-sizing:border-box}html,body,#root{height:100%;margin:0;overflow:hidden}button,input{font:inherit}button{cursor:pointer}button:focus-visible,input:focus-visible{outline:4px solid #ffe067;outline-offset:4px}.sr-only{height:1px;left:-10000px;overflow:hidden;position:absolute;width:1px}
 

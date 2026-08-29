@@ -1,39 +1,28 @@
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, rm } from 'node:fs/promises'
+import { spawn } from 'node:child_process'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { getOnboardingState, previewMember, previewProject, saveMember, saveProject } from '../server/onboarding.mjs'
+import { join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { analyzeProject, localDraft } from '../server/project-wiki-architect.mjs'
+import { previewBlueprint, saveBlueprint } from '../server/onboarding.mjs'
+import { runWikiArchitect } from '../core/wiki-architect.mjs'
 
-const root = await mkdtemp(join(tmpdir(), 'knowledge-guild-onboarding-'))
-const project = { projectName: '온보딩 길드', summary: '인터뷰로 태어나는 Wiki 마을 #1', problem: '시작 전에 개인 관점과 공통 사실이 섞인다.', audience: '함께 프로젝트를 시작하는 팀', outcome: '확인 가능한 project context와 개인 Wiki를 만든다.' }
-const member = { memberId: 'daeho-hwang', identity: '대호', perspective: '개인 관점은 공통 사실과 분리되어야 한다.', role: '온보딩 설계', dataCollection: '인터뷰 답변과 확인된 Wiki 기록', desiredOutcome: '근거를 확인할 수 있는 마을 경험' }
-
+const runCli = (args, input) => new Promise((resolvePromise, reject) => { const child = spawn(process.execPath, args, { cwd: appRoot, stdio: ['pipe', 'pipe', 'pipe'] }); let stdout = ''; let stderr = ''; child.stdout.on('data', chunk => { stdout += chunk }); child.stderr.on('data', chunk => { stderr += chunk }); child.on('error', reject); child.on('close', code => code === 0 ? resolvePromise({ stdout }) : reject(new Error(stderr || `CLI exited ${code}`))); child.stdin.end(input) }); const root = await mkdtemp(join(tmpdir(), 'knowledge-guild-architect-')); const appRoot = resolve(fileURLToPath(new URL('..', import.meta.url))); const statement = '학습 팀이 기술 실험을 정리하고 반복 가능한 교육 결과를 만들고 싶다.'; const marketStatement = '시장 신호와 경쟁 기업을 분석해 투자 가설의 결론을 만들고 싶다.'
+const expect = (value, message) => { if (!value) throw new Error(message) }
 try {
   await mkdir(join(root, 'projects'), { recursive: true }); await mkdir(join(root, 'members'), { recursive: true })
-  if ((await getOnboardingState({ repoRoot: root })).phase !== 'PROJECT_UNINITIALIZED') throw new Error('Missing canonical project did not start uninitialized')
-  await writeFile(join(root, 'projects', 'PROJECT_CONTEXT.md'), '# placeholder\n')
-  if ((await getOnboardingState({ repoRoot: root })).phase !== 'PROJECT_UNINITIALIZED') throw new Error('Placeholder project context initialized the app')
-  await rm(join(root, 'projects', 'PROJECT_CONTEXT.md'))
-  const projectPreview = previewProject(project)
-  if (projectPreview.files[0].path !== 'projects/PROJECT_CONTEXT.md' || !projectPreview.files[0].content.includes('knowledge-guild-project-context/v1')) throw new Error('Project preview schema is incomplete')
-  const afterProject = await saveProject(project, { repoRoot: root, refresh: false })
-  if (afterProject.phase !== 'MEMBER_ONBOARDING') throw new Error('Project save did not enter member onboarding')
-  const context = await readFile(join(root, 'projects', 'PROJECT_CONTEXT.md'), 'utf8')
-  if (!context.includes('knowledgeType: fact') || !context.includes(project.problem)) throw new Error('Project context schema/content is incomplete')
-  await saveProject(project, { repoRoot: root, refresh: false }).then(() => { throw new Error('Canonical project overwrite accepted') }, error => { if (error.status !== 409) throw error })
-  await saveMember({ ...member, memberId: '../escape' }, { repoRoot: root, refresh: false }).then(() => { throw new Error('Traversal member id accepted') }, error => { if (error.code !== 'invalid-member-id') throw error })
-  const memberPreview = previewMember(member)
-  if (memberPreview.files.map(file => file.path).join('|') !== 'members/daeho-hwang/CONTEXT.md|members/daeho-hwang/WIKI_SCHEMA.md|members/daeho-hwang/wiki/index.md') throw new Error('Member preview contains unexpected paths')
-  const afterMember = await saveMember(member, { repoRoot: root, refresh: false })
-  if (afterMember.phase !== 'VILLAGE_READY' || afterMember.members[0]?.id !== member.memberId) throw new Error('Member save did not enter village state')
-  for (const file of memberPreview.files) { const content = await readFile(join(root, file.path), 'utf8'); if (!content.includes('knowledge-guild-member-context/v1')) throw new Error(`Generated member schema missing: ${file.path}`) }
-  await writeFile(join(root, 'members', member.memberId, 'wiki', 'index.md'), '---\nschema: knowledge-guild-member-context/v1\nmemberId: daeho-hwang\nknowledgeType: personal-opinion\n---\n\n# Incomplete\n')
-  if ((await getOnboardingState({ repoRoot: root })).phase !== 'MEMBER_ONBOARDING') throw new Error('Incomplete member files produced a valid village resident')
-  await saveMember(member, { repoRoot: root, refresh: false }).then(() => { throw new Error('Duplicate member overwrite accepted') }, error => { if (error.status !== 409) throw error })
-  const readonlyRoot = await mkdtemp(join(tmpdir(), 'knowledge-guild-readonly-'))
-  try {
-    await mkdir(join(readonlyRoot, 'projects'), { recursive: true }); await mkdir(join(readonlyRoot, 'members'), { recursive: true })
-    await saveProject(project, { repoRoot: readonlyRoot, readOnly: true, refresh: false }).then(() => { throw new Error('Read-only project save accepted') }, error => { if (error.code !== 'read-only') throw error })
-    if ((await getOnboardingState({ repoRoot: readonlyRoot, readOnly: true })).persistenceMode !== 'read-only-demo') throw new Error('Read-only mode was not explicit')
-  } finally { await rm(readonlyRoot, { recursive: true, force: true }) }
-  console.log('Validated project/member onboarding states, canonical Markdown, collision/traversal guards, and read-only persistence.')
+  const creativeStatement = '창작 세계관과 캐릭터, 플롯을 정리해 소설 산출물을 만들고 싶다.'; const learning = localDraft(statement); const market = localDraft(marketStatement); const creative = localDraft(creativeStatement)
+  expect(learning.mode === 'local-draft' && learning.blueprint.pageTypes.some(item => item.id === 'technical'), 'Learning draft did not receive domain routing'); expect(market.blueprint.pageTypes.some(item => item.id === 'market') && !market.blueprint.pageTypes.some(item => item.id === 'technical'), 'Market draft did not receive distinct routing'); expect(creative.blueprint.pageTypes.some(item => item.id === 'world') && creative.blueprint.pageTypes.some(item => item.id === 'plot'), 'Creative draft did not receive distinct routing'); expect(!JSON.stringify(learning.brief).includes(statement), 'Raw statement leaked into interpreted brief')
+  expect(learning.nextQuestion === null || typeof learning.nextQuestion === 'string', 'Clarification contract is invalid'); const ambiguous = localDraft('wiki'); expect(ambiguous.nextQuestion, 'Ambiguous input did not ask a question'); const second = await runWikiArchitect('clarify', { statement: 'wiki', clarifications: ['학습 팀용', '팀이 읽을 Wiki'] }); expect(!second.events.some(item => item.type === 'question.asked'), 'Clarification limit exceeded two questions')
+  const malformed = await analyzeProject({ statement }, { responsesClient: { responses: { create: async () => ({ output_text: 'not-json' }) } } }); expect(malformed.mode === 'local-draft', 'Malformed LLM response was not labelled local draft'); const leaked = await analyzeProject({ statement }, { responsesClient: { responses: { create: async () => ({ output_text: JSON.stringify({ ...learning.blueprint, brief: { ...learning.brief, purpose: statement } }) }) } } }); expect(leaked.mode === 'local-draft', 'LLM copied the raw statement into a persisted field')
+  const identity = { memberId: 'daeho-hwang', displayName: '대호', workingContext: '승인된 학습 Wiki 구조를 검토합니다.' }; const preview = previewBlueprint({ blueprint: learning.blueprint, identity }); expect(preview.files.every(file => /^(projects|members\/daeho-hwang)\/(?!.*(?:\.env|private|secrets))/.test(file.path)), 'Preview contains a forbidden path'); expect(preview.files.some(file => file.path === 'projects/raw/README.md') && preview.files.some(file => file.path.includes('/output/README.md')) && preview.files.some(file => file.path.endsWith('WIKI_INDEX.md')), 'Layer/index scaffold is incomplete')
+  const tailored = structuredClone(learning.blueprint); tailored.pageTypes = [{ id: 'experiment-map', label: 'experiment map', route: 'wiki/experiment-map/index.md', reason: '이 프로젝트만의 실험 흐름을 정리하기 위해' }]; expect(previewBlueprint({ blueprint: tailored, identity }).files.some(file => file.path.endsWith('wiki/experiment-map/index.md')), 'A safe project-specific page type was rejected')
+  const saved = await saveBlueprint({ blueprint: learning.blueprint, identity, expectedDigest: preview.digest }, { repoRoot: root, refresh: false }); const context = await readFile(join(root, 'projects', 'PROJECT_CONTEXT.md'), 'utf8'); expect(!context.includes(statement), 'Raw input was persisted'); expect(await readFile(join(root, 'members', 'daeho-hwang', 'CONTEXT.md'), 'utf8'), 'Member scaffold missing'); expect(saved.phase === 'VILLAGE_READY' && saved.members.some(member => member.id === identity.memberId), 'Saved scaffold did not become a ready village')
+  await saveBlueprint({ blueprint: learning.blueprint, identity, expectedDigest: preview.digest }, { repoRoot: root, refresh: false }).then(() => { throw new Error('Collision accepted') }, error => expect(error.code === 'collision', 'Wrong collision error'))
+  const forbidden = structuredClone(learning.blueprint); forbidden.pageTypes[0].route = '../../secrets.md'; expect(() => previewBlueprint({ blueprint: forbidden, identity }), 'Forbidden route accepted')
+  const readonlyRoot = await mkdtemp(join(tmpdir(), 'knowledge-guild-readonly-')); try { await saveBlueprint({ blueprint: learning.blueprint, identity, expectedDigest: preview.digest }, { repoRoot: readonlyRoot, readOnly: true, refresh: false }).then(() => { throw new Error('Read-only write accepted') }, error => expect(error.code === 'read-only', 'Wrong read-only error')) } finally { await rm(readonlyRoot, { recursive: true, force: true }) }
+  const core = await runWikiArchitect('analyze', { statement }); expect(core.events.some(item => item.type === 'session.started') && core.events.some(item => item.type === 'blueprint.proposed') && core.events.some(item => item.type === 'approval.required') && core.events.some(item => item.type === 'session.completed'), 'Core event contract is incomplete')
+  const cli = await runCli(['scripts/wiki-architect-cli.mjs', '--command', 'analyze'], JSON.stringify({ statement })); const cliEvents = cli.stdout.trim().split('\n').map(JSON.parse); const cliResult = cliEvents.find(item => item.type === 'result')?.result; expect(cliEvents.some(item => item.type === 'blueprint.proposed') && cliResult, 'CLI did not project core events'); expect(JSON.stringify(cliResult.blueprint) === JSON.stringify(core.result.blueprint), 'CLI and core produced different blueprints')
+  const cliRoot = await mkdtemp(join(tmpdir(), 'knowledge-guild-cli-')); try { await mkdir(join(cliRoot, 'projects'), { recursive: true }); await mkdir(join(cliRoot, 'members'), { recursive: true }); const cliPreview = previewBlueprint({ blueprint: learning.blueprint, identity: { ...identity, memberId: 'cli-member' } }); const cliSave = await runCli(['scripts/wiki-architect-cli.mjs', '--command', 'save', '--repo-root', cliRoot], JSON.stringify({ blueprint: learning.blueprint, identity: { ...identity, memberId: 'cli-member' }, expectedDigest: cliPreview.digest })); const cliSaveEvents = cliSave.stdout.trim().split('\n').map(JSON.parse); expect(cliSaveEvents.some(item => item.type === 'files.written') && await readFile(join(cliRoot, 'projects', 'PROJECT_CONTEXT.md'), 'utf8'), 'CLI did not create actual scaffold') } finally { await rm(cliRoot, { recursive: true, force: true }) }
+  console.log('Validated architect routing, fallback/clarification, safe approval-gated scaffold, collisions, read-only refusal, and core/CLI event parity.')
 } finally { await rm(root, { recursive: true, force: true }) }
