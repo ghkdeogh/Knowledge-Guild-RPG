@@ -4,6 +4,7 @@ import { isCurrentRequest } from './chat-request.js'
 import Onboarding from './Onboarding.jsx'
 import { memberHomePosition } from './village-layout.js'
 import { confirmMemberSeen, repositoryPathState, selectRepositoryBark } from './guild.js'
+import { answerBubbleView, answerTargetKey, beginAnswerProjection, resolveAnswerProjection, shouldHideRepositoryBark } from './answer-bubbles.js'
 
 const palette = ['sage', 'berry', 'ochre', 'lake', 'clay', 'plum', 'pine', 'sun']
 
@@ -13,10 +14,10 @@ const getMemberDocuments = member => (member?.documentIds || [])
   .map(id => documentsById.get(id))
   .filter(document => document?.scope === 'personal' && document.memberId === member.id)
 
-function PixelAvatar({ member, tone, onEnter, onSelect, pose = 'neutral' }) {
+function PixelAvatar({ member, tone, onEnter, onSelect, pose = 'neutral', querying = false }) {
   const role = member.role?.id || 'archivist'
   return (
-    <button className={`villager ${tone} role-${role} pose-${pose}`} data-member-id={member.id} onClick={() => onSelect?.()} aria-label={`${member.displayName}의 공개 Wiki 경로 상태 보기`}>
+    <button className={`villager ${tone} role-${role} pose-${pose}`} data-member-id={member.id} onClick={() => onSelect?.()} aria-label={`${member.displayName}의 공개 Wiki 경로 상태 보기${querying ? ' · 현재 UI 요청 상태: 기록을 살펴보는 중' : ''}`}>
       <span className="villager-shadow" />
       <span className="villager-sprite" aria-hidden="true">
         <i className="villager-hair" /><i className="villager-face" />
@@ -33,7 +34,13 @@ function RepositoryBark({ bark, onOpen, onDismiss }) {
   return <aside className="repository-bark" role="status" aria-live="polite" aria-label="공개 Wiki 경로 상태"><button onClick={onOpen}>{bark.state.message}<small>공개 Wiki 경로 상태 보기</small></button><button className="bark-dismiss" onClick={onDismiss} aria-label="이 경로 상태 말풍선 닫기">×</button></aside>
 }
 
-function MemberHome({ member, index, onEnter, onSelect, pose, bark, onBarkOpen, onBarkDismiss }) {
+function AnswerBubble({ view, onOpen, onDismiss, project = false }) {
+  if (!view) return null
+  if (view.phase === 'pending') return <aside className={`answer-bubble pending${project ? ' project-answer-bubble' : ''}`} aria-label="현재 UI 요청 상태"><span>{view.text}</span><small>{view.detail}</small></aside>
+  return <aside className={`answer-bubble${project ? ' project-answer-bubble' : ''}`} role="status" aria-live="polite" aria-label="Wiki 답변 도착"><button onClick={onOpen}><span>{view.text}</span><small>{view.modeLabel} · 신뢰도 {view.confidence} · {view.knowledgeType}</small><b>전체 답변 · 근거 보기</b></button><button className="bubble-dismiss" onClick={onDismiss} aria-label="이 답변 말풍선 닫기">×</button></aside>
+}
+
+function MemberHome({ member, index, onEnter, onSelect, pose, bark, onBarkOpen, onBarkDismiss, answerBubble, onAnswerOpen, onAnswerDismiss, querying }) {
   const spot = memberHomePosition(index)
   const position = { left: `${spot.left}%`, top: `${spot.top}%` }
   const tone = palette[index % palette.length]
@@ -46,8 +53,9 @@ function MemberHome({ member, index, onEnter, onSelect, pose, bark, onBarkOpen, 
         <span className="window left" /><span className="window right" /><span className="door" />
         <span className="house-sign"><b>{member.displayName}</b><small>{count} WIKI</small></span>
       </button>
-      <PixelAvatar member={member} tone={tone} onEnter={onEnter} onSelect={onSelect} pose={pose} />
+      <PixelAvatar member={member} tone={tone} onEnter={onEnter} onSelect={onSelect} pose={pose} querying={querying} />
       <RepositoryBark bark={bark} onOpen={onBarkOpen} onDismiss={onBarkDismiss} />
+      <AnswerBubble view={answerBubble} onOpen={onAnswerOpen} onDismiss={onAnswerDismiss} />
     </section>
   )
 }
@@ -148,17 +156,18 @@ function MissionBoard({ onAskProject, onRepositoryCheck, onSkills, onChanges, re
   )
 }
 
-function AnswerPanel({ target, onClose, docked = false }) {
+function AnswerPanel({ target, onClose, docked = false, onAnswerStart, onAnswerResult }) {
   const scope = target?.scope || 'project'
   const member = target?.member || null
   const [question, setQuestion] = useState('')
-  const [reply, setReply] = useState(null)
-  const [drawer, setDrawer] = useState(null)
   const [pending, setPending] = useState(false)
   const requestId = useRef(0)
   const requestController = useRef(null)
   const previousFocus = useRef(null)
   const panelRef = useRef(null)
+  const onCloseRef = useRef(onClose)
+
+  useEffect(() => { onCloseRef.current = onClose }, [onClose])
 
   useEffect(() => {
     previousFocus.current = document.activeElement
@@ -167,12 +176,12 @@ function AnswerPanel({ target, onClose, docked = false }) {
   useEffect(() => {
     requestController.current?.abort()
     requestId.current += 1
-    setQuestion(''); setReply(null); setDrawer(null); setPending(false)
+    setQuestion(''); setPending(false)
   }, [scope, member?.id])
   const closePanel = () => {
     requestController.current?.abort()
     requestId.current += 1
-    onClose()
+    onCloseRef.current()
   }
   useEffect(() => {
     const onKeyDown = event => {
@@ -189,7 +198,7 @@ function AnswerPanel({ target, onClose, docked = false }) {
       requestController.current?.abort()
       window.removeEventListener('keydown', onKeyDown)
     }
-  }, [onClose])
+  }, [])
   const submit = async event => {
     event.preventDefault()
     if (!question.trim() || pending) return
@@ -199,37 +208,47 @@ function AnswerPanel({ target, onClose, docked = false }) {
     const controller = new AbortController()
     const requestTimeout = window.setTimeout(() => controller.abort(), 12000)
     requestController.current = controller
-    setPending(true); setDrawer(null)
+    const projectionRequestId = onAnswerStart?.({ scope, member })
+    setPending(true)
     try {
       const response = await fetch('/api/wiki-chat', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ scope, memberId: member?.id, question }), signal: controller.signal })
       const body = await response.json()
       const hasExpectedScope = body && body.sourceScope === scope && (scope === 'personal' ? body.memberId === member?.id : body.memberId === null)
       const hasEnvelope = body && typeof body.answer === 'string' && Array.isArray(body.citations) && typeof body.confidence === 'string' && typeof body.knowledgeType === 'string' && typeof body.limitation === 'string'
-      if (isCurrentRequest(nextRequest, requestId.current)) setReply(response.ok && hasExpectedScope && hasEnvelope ? body : { mode: 'error', sourceScope: scope, answer: '요청을 처리하지 못했습니다.', citations: [], confidence: 'low', knowledgeType: 'wiki-record', limitation: body?.error || '서버 응답의 범위 또는 계약을 확인하지 못했습니다.' })
+      if (isCurrentRequest(nextRequest, requestId.current)) onAnswerResult?.(projectionRequestId, { scope, member }, response.ok && hasExpectedScope && hasEnvelope ? body : { mode: 'error', sourceScope: scope, answer: '지금은 답변을 가져오지 못했어요.', citations: [], confidence: 'low', knowledgeType: 'wiki-record', limitation: body?.error || '서버 응답의 범위 또는 계약을 확인하지 못했습니다.' })
     } catch (error) {
-      if (error.name !== 'AbortError' && isCurrentRequest(nextRequest, requestId.current)) setReply({ mode: 'error', sourceScope: scope, answer: '연결 오류로 답변을 받지 못했습니다.', citations: [], confidence: 'low', knowledgeType: 'wiki-record', limitation: '네트워크 연결을 확인한 뒤 다시 시도하세요.' })
+      if (error.name !== 'AbortError' && isCurrentRequest(nextRequest, requestId.current)) onAnswerResult?.(projectionRequestId, { scope, member }, { mode: 'error', sourceScope: scope, answer: '지금은 답변을 가져오지 못했어요.', citations: [], confidence: 'low', knowledgeType: 'wiki-record', limitation: '네트워크 연결을 확인한 뒤 다시 시도하세요.' })
     } finally { window.clearTimeout(requestTimeout); if (isCurrentRequest(nextRequest, requestId.current)) setPending(false) }
   }
-  const safeCitation = item => {
-    const document = documentsById.get(item.id)
-    return document && document.scope === scope && (scope !== 'personal' || document.memberId === member?.id) ? document : null
-  }
-  const cited = (reply?.citations || []).map(safeCitation).filter(Boolean)
   const scopeLabel = scope === 'personal' ? `${member?.displayName} 개인 Wiki` : '프로젝트 공통 기록'
   return (
-    <section className={`answer-panel${docked ? ' guild-prompt-dock' : ''}${reply ? ' has-answer' : ''}`} ref={panelRef} role={docked ? 'region' : 'dialog'} aria-modal={docked ? undefined : 'true'} aria-labelledby="answer-title">
+    <section className={`answer-panel${docked ? ' guild-prompt-dock' : ''}`} ref={panelRef} role={docked ? 'region' : 'dialog'} aria-modal={docked ? undefined : 'true'} aria-labelledby="answer-title">
       <header><div><small>{docked ? 'GUILD PROMPT' : 'TRACEABLE ANSWER'}</small><h2 id="answer-title">{scopeLabel}</h2><p>질문 범위는 잠겨 있으며, 이 패널은 다른 기록을 보충하지 않습니다.</p></div>{!docked && <button className="exit-button" onClick={closePanel} autoFocus>닫기</button>}{docked && scope === 'personal' && <button className="exit-button" onClick={onClose}>프로젝트로</button>}</header>
       <div className="scope-lock"><b>Source scope</b><span>{scope === 'personal' ? `personal · members/${member?.id}/` : 'project · projects/'}</span></div>
       <form onSubmit={submit}><label htmlFor="guild-question">이 범위에서 확인할 질문</label><textarea id="guild-question" value={question} onChange={event => setQuestion(event.target.value)} maxLength="600" placeholder="기록 안에서 확인할 내용을 입력하세요." /><button type="submit" disabled={pending}>{pending ? '근거 확인 중…' : '근거로 답변 받기'}</button></form>
-      {reply && <article className={`answer-card mode-${reply.mode}`}>
-        <div className="answer-labels"><span>{modeCopy[reply.mode] || '응답 상태'}</span><span>신뢰도: {reply.confidence}</span><span>기록 유형: {reply.knowledgeType}</span></div>
-        <p className="answer-text">{reply.answer}</p>
-        <p className="answer-limitation"><b>한계</b> {reply.limitation}</p>
-        <div className="citation-row"><b>허용된 출처</b>{cited.length ? cited.map(document => <button key={document.id} onClick={() => setDrawer(document)}>근거 열기: {document.title}</button>) : <span>이 답변에는 표시할 허용 근거가 없습니다.</span>}</div>
-      </article>}
-      {drawer && <aside className="source-drawer" aria-label="선택한 근거"><header><div><small>ALLOWLISTED SOURCE</small><h3>{drawer.title}</h3></div><button onClick={() => setDrawer(null)}>닫기</button></header><p>{drawer.excerpt}</p><dl><div><dt>Source path</dt><dd><code>{drawer.source}</code></dd></div><div><dt>Scope</dt><dd>{drawer.scope}</dd></div><div><dt>Record type</dt><dd>{drawer.knowledgeType}</dd></div></dl></aside>}
     </section>
   )
+}
+
+const safeCitation = (item, target) => {
+  const document = documentsById.get(item?.id)
+  return document && document.scope === target?.scope && (target?.scope !== 'personal' || document.memberId === target.memberId) ? document : null
+}
+
+function SourceDrawer({ document, onClose }) {
+  if (!document) return null
+  return <aside className="source-drawer" aria-label="선택한 근거"><header><div><small>ALLOWLISTED SOURCE</small><h3>{document.title}</h3></div><button onClick={onClose}>닫기</button></header><p>{document.excerpt}</p><dl><div><dt>Source path</dt><dd><code>{document.source}</code></dd></div><div><dt>Scope</dt><dd>{document.scope}</dd></div><div><dt>Record type</dt><dd>{document.knowledgeType}</dd></div></dl></aside>
+}
+
+function GuildAnswerScroll({ projection, onClose, onRetry }) {
+  const [drawer, setDrawer] = useState(null)
+  const reply = projection?.reply
+  const target = projection?.target
+  const cited = (reply?.citations || []).map(item => safeCitation(item, target)).filter(Boolean)
+  useEffect(() => { const close = event => event.key === 'Escape' && onClose(); window.addEventListener('keydown', close); return () => window.removeEventListener('keydown', close) }, [onClose])
+  if (!reply || !target) return null
+  const label = target.scope === 'personal' ? `${target.displayName} 개인 Wiki` : '프로젝트 공통 기록'
+  return <aside className="guild-answer-scroll" role="dialog" aria-modal="true" aria-label={`${label} 전체 답변`}><header><div><small>GUILD ANSWER SCROLL</small><h2>{label}</h2><p>{modeCopy[reply.mode] || '응답 상태'} · {reply.sourceScope}</p></div><button className="exit-button" onClick={onClose} autoFocus>닫기</button></header><div className="answer-labels"><span>신뢰도: {reply.confidence}</span><span>기록 유형: {reply.knowledgeType}</span></div><p className="answer-text">{reply.mode === 'unsupported' ? '이 Wiki 기록에서는 답을 찾지 못했어요.' : reply.mode === 'error' ? '지금은 답변을 가져오지 못했어요.' : reply.answer}</p><p className="answer-limitation"><b>한계</b> {reply.limitation}</p>{reply.mode === 'error' && <button className="retry-answer" onClick={onRetry}>Guild Prompt에서 다시 질문하기</button>}<section className="scroll-citations"><h3>허용된 근거</h3>{cited.length ? cited.map(document => <button key={document.id} onClick={() => setDrawer(document)}>근거 열기: {document.title}</button>) : <p>이 답변에는 표시할 허용 근거가 없습니다.</p>}</section><SourceDrawer document={drawer} onClose={() => setDrawer(null)} /></aside>
 }
 
 function VillageScenery() {
@@ -271,12 +290,16 @@ function RepositoryChanges({ repository, scope, member, seenNews, onConfirm, onC
 function App() {
   const [openMemberId, setOpenMemberId] = useState(null)
   const [answerTarget, setAnswerTarget] = useState({ scope: 'project' })
+  const [answerProjection, setAnswerProjection] = useState(null)
+  const [showAnswerScroll, setShowAnswerScroll] = useState(false)
   const [selectedMemberId, setSelectedMemberId] = useState(null)
   const [repository, setRepository] = useState(null)
   const [seenNews, setSeenNews] = useState(() => { try { const value = JSON.parse(localStorage.getItem('knowledge-guild-seen-news') || '{}'); return value && typeof value === 'object' && !Array.isArray(value) ? value : {} } catch { return {} } })
   const [dismissedBarks, setDismissedBarks] = useState({})
   const [changesScope, setChangesScope] = useState(null)
   const changesReturnFocus = useRef(null)
+  const answerRequestId = useRef(0)
+  const answerReturnFocus = useRef(null)
   const [showSkills, setShowSkills] = useState(false); const [skillDetail, setSkillDetail] = useState(null); const [skillScope, setSkillScope] = useState({ scope: 'project', memberId: null })
   const [onboardingState, setOnboardingState] = useState(() => ({ persistenceMode: 'local-writable', phase: snapshot.projectState === 'VILLAGE_READY' ? 'VILLAGE_READY' : snapshot.projectState === 'PROJECT_READY' ? 'MEMBER_ONBOARDING' : 'PROJECT_UNINITIALIZED' }))
   const openMember = snapshot.members.find(member => member.id === openMemberId) || null
@@ -286,6 +309,15 @@ function App() {
   const closeChanges = () => { const currentScope = changesScope; setChangesScope(null); window.setTimeout(() => { const fallback = currentScope?.scope === 'member' ? document.querySelector(`.villager[data-member-id="${currentScope.memberId}"]`) : document.querySelector('.project-change-action'); (changesReturnFocus.current?.isConnected ? changesReturnFocus.current : fallback)?.focus?.() }, 0) }
   const confirmSeen = memberId => { const next = confirmMemberSeen(seenNews, memberId, repository); setSeenNews(next); try { localStorage.setItem('knowledge-guild-seen-news', JSON.stringify(next)) } catch {} closeChanges() }
   const bark = selectRepositoryBark(snapshot.members, repository, seenNews, dismissedBarks)
+  const beginAnswer = target => { const requestId = answerRequestId.current + 1; answerRequestId.current = requestId; setShowAnswerScroll(false); setAnswerProjection(beginAnswerProjection(requestId, target)); return requestId }
+  const receiveAnswer = (requestId, target, reply) => setAnswerProjection(current => resolveAnswerProjection(current, requestId, target, reply))
+  const openAnswerScroll = event => { answerReturnFocus.current = event.currentTarget; setShowAnswerScroll(true) }
+  const closeAnswerScroll = () => { setShowAnswerScroll(false); window.setTimeout(() => answerReturnFocus.current?.focus?.(), 0) }
+  const dismissAnswer = () => { setShowAnswerScroll(false); setAnswerProjection(null) }
+  const focusComposer = () => { closeAnswerScroll(); window.setTimeout(() => document.getElementById('guild-question')?.focus(), 0) }
+  const bubbleView = answerBubbleView(answerProjection)
+  const answerTargetId = answerProjection?.target?.memberId || null
+  const setScopedAnswerTarget = target => { setAnswerTarget(target); setAnswerProjection(current => current?.phase === 'pending' && answerTargetKey(current.target) !== answerTargetKey(target) ? null : current) }
 
   useEffect(() => {
     let active = true
@@ -299,17 +331,19 @@ function App() {
     <main className="village-app">
       <section className="village-map" aria-label="Knowledge Guild 마을">
         <VillageScenery />
-        <MissionBoard onAskProject={() => setAnswerTarget({ scope: 'project' })} onSkills={() => { setSkillScope({ scope: 'project', memberId: null }); setSkillDetail(null); setShowSkills(true) }} onRepositoryCheck={checkRepository} onChanges={event => openChanges('project', null, event.currentTarget)} repository={repository} />
+        <MissionBoard onAskProject={() => setScopedAnswerTarget({ scope: 'project' })} onSkills={() => { setSkillScope({ scope: 'project', memberId: null }); setSkillDetail(null); setShowSkills(true) }} onRepositoryCheck={checkRepository} onChanges={event => openChanges('project', null, event.currentTarget)} repository={repository} />
+        {answerProjection?.target.scope === 'project' && <AnswerBubble project view={bubbleView} onOpen={openAnswerScroll} onDismiss={dismissAnswer} />}
         {snapshot.members.map((member, index) => (
-          <MemberHome key={member.id} member={member} index={index} pose={poseFor(member, repository, seenNews)} bark={bark?.member.id === member.id ? bark : null} onBarkOpen={event => openChanges('member', member.id, event.currentTarget)} onBarkDismiss={() => setDismissedBarks(value => ({ ...value, [bark.key]: true }))} onEnter={() => setOpenMemberId(member.id)} onSelect={() => setSelectedMemberId(member.id)} />
+          <MemberHome key={member.id} member={member} index={index} pose={answerProjection?.phase === 'pending' && answerTargetId === member.id ? 'querying' : poseFor(member, repository, seenNews)} querying={answerProjection?.phase === 'pending' && answerTargetId === member.id} answerBubble={answerTargetId === member.id ? bubbleView : null} onAnswerOpen={openAnswerScroll} onAnswerDismiss={dismissAnswer} bark={!shouldHideRepositoryBark(answerProjection) && bark?.member.id === member.id ? bark : null} onBarkOpen={event => openChanges('member', member.id, event.currentTarget)} onBarkDismiss={() => setDismissedBarks(value => ({ ...value, [bark.key]: true }))} onEnter={() => setOpenMemberId(member.id)} onSelect={() => setSelectedMemberId(member.id)} />
         ))}
         <div className="map-seal" aria-hidden="true"><b>KNOWLEDGE</b><span>GUILD</span></div>
       </section>
-      {selectedMember && <CharacterMenu member={selectedMember} onClose={() => setSelectedMemberId(null)} onAsk={() => { setAnswerTarget({ scope: 'personal', member: selectedMember }); setSelectedMemberId(null) }} onHome={() => { setOpenMemberId(selectedMember.id); setSelectedMemberId(null) }} onSkills={() => { setSkillScope({ scope: 'member', memberId: selectedMember.id }); setSkillDetail(null); setShowSkills(true); setSelectedMemberId(null) }} onChanges={event => { openChanges('member', selectedMember.id, event.currentTarget); setSelectedMemberId(null) }} />}
-      {openMember && <HouseInterior key={openMember.id} member={openMember} onClose={() => setOpenMemberId(null)} onAsk={member => { setOpenMemberId(null); setAnswerTarget({ scope: 'personal', member }) }} />}
-      <AnswerPanel key={`${answerTarget.scope}-${answerTarget.member?.id || 'project'}`} target={answerTarget} docked onClose={() => setAnswerTarget({ scope: 'project' })} />
+      {selectedMember && <CharacterMenu member={selectedMember} onClose={() => setSelectedMemberId(null)} onAsk={() => { setScopedAnswerTarget({ scope: 'personal', member: selectedMember }); setSelectedMemberId(null) }} onHome={() => { setOpenMemberId(selectedMember.id); setSelectedMemberId(null) }} onSkills={() => { setSkillScope({ scope: 'member', memberId: selectedMember.id }); setSkillDetail(null); setShowSkills(true); setSelectedMemberId(null) }} onChanges={event => { openChanges('member', selectedMember.id, event.currentTarget); setSelectedMemberId(null) }} />}
+      {openMember && <HouseInterior key={openMember.id} member={openMember} onClose={() => setOpenMemberId(null)} onAsk={member => { setOpenMemberId(null); setScopedAnswerTarget({ scope: 'personal', member }) }} />}
+      <AnswerPanel key={`${answerTarget.scope}-${answerTarget.member?.id || 'project'}`} target={answerTarget} docked onClose={() => setScopedAnswerTarget({ scope: 'project' })} onAnswerStart={beginAnswer} onAnswerResult={receiveAnswer} />
       {showSkills && <SkillStation skills={(snapshot.skills || []).filter(skill => skillScope.scope === 'member' ? skill.memberId === skillScope.memberId : skill.scope === 'project')} detail={skillDetail} onDetail={setSkillDetail} onClose={() => { setShowSkills(false); setSkillDetail(null) }} />}
       {changesScope && <RepositoryChanges repository={repository} scope={changesScope.scope} member={snapshot.members.find(member => member.id === changesScope.memberId)} seenNews={seenNews} onConfirm={() => confirmSeen(changesScope.memberId)} onClose={closeChanges} />}
+      {showAnswerScroll && answerProjection?.phase === 'answer' && <GuildAnswerScroll projection={answerProjection} onClose={closeAnswerScroll} onRetry={focusComposer} />}
       <p className="sr-only" aria-live="polite">{openMember ? `${openMember.displayName}의 Wiki 집 내부` : '길드 마을'}</p>
     </main>
   )
