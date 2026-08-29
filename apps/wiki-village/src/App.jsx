@@ -16,7 +16,7 @@ const getMemberDocuments = member => (member?.documentIds || [])
 function PixelAvatar({ member, tone, onEnter, onSelect, pose = 'neutral' }) {
   const role = member.role?.id || 'archivist'
   return (
-    <button className={`villager ${tone} role-${role} pose-${pose}`} onClick={() => onSelect?.()} aria-label={`${member.displayName}의 공개 Wiki 경로 상태 보기`}>
+    <button className={`villager ${tone} role-${role} pose-${pose}`} data-member-id={member.id} onClick={() => onSelect?.()} aria-label={`${member.displayName}의 공개 Wiki 경로 상태 보기`}>
       <span className="villager-shadow" />
       <span className="villager-sprite" aria-hidden="true">
         <i className="villager-hair" /><i className="villager-face" />
@@ -281,8 +281,8 @@ function App() {
   const openMember = snapshot.members.find(member => member.id === openMemberId) || null
   const selectedMember = snapshot.members.find(member => member.id === selectedMemberId) || null
   const checkRepository = async () => { try { const response = await fetch('/api/repository-status', { method: 'POST' }); const result = await response.json(); setRepository(result); setDismissedBarks({}); return result } catch { const result = { mode: 'error', message: '저장소 상태를 확인할 수 없습니다.', project: {} }; setRepository(result); return result } }
-  const openChanges = (scope, memberId = null) => { changesReturnFocus.current = document.activeElement; setChangesScope({ scope, memberId }) }
-  const closeChanges = () => { setChangesScope(null); window.setTimeout(() => changesReturnFocus.current?.focus?.(), 0) }
+  const openChanges = (scope, memberId = null, trigger) => { changesReturnFocus.current = trigger || document.activeElement; setChangesScope({ scope, memberId }) }
+  const closeChanges = () => { const currentScope = changesScope; setChangesScope(null); window.setTimeout(() => { const fallback = currentScope?.scope === 'member' ? document.querySelector(`.villager[data-member-id="${currentScope.memberId}"]`) : document.querySelector('.project-change-action'); (changesReturnFocus.current?.isConnected ? changesReturnFocus.current : fallback)?.focus?.() }, 0) }
   const confirmSeen = memberId => { const next = confirmMemberSeen(seenNews, memberId, repository); setSeenNews(next); try { localStorage.setItem('knowledge-guild-seen-news', JSON.stringify(next)) } catch {} closeChanges() }
   const bark = selectRepositoryBark(snapshot.members, repository, seenNews, dismissedBarks)
 
@@ -298,13 +298,13 @@ function App() {
     <main className="village-app">
       <section className="village-map" aria-label="Knowledge Guild 마을">
         <VillageScenery />
-        <MissionBoard onAskProject={() => setAnswerTarget({ scope: 'project' })} onSkills={() => { setSkillScope({ scope: 'project', memberId: null }); setSkillDetail(null); setShowSkills(true) }} onRepositoryCheck={checkRepository} onChanges={() => openChanges('project')} repository={repository} />
+        <MissionBoard onAskProject={() => setAnswerTarget({ scope: 'project' })} onSkills={() => { setSkillScope({ scope: 'project', memberId: null }); setSkillDetail(null); setShowSkills(true) }} onRepositoryCheck={checkRepository} onChanges={event => openChanges('project', null, event.currentTarget)} repository={repository} />
         {snapshot.members.map((member, index) => (
-          <MemberHome key={member.id} member={member} index={index} pose={poseFor(member, repository, seenNews)} bark={bark?.member.id === member.id ? bark : null} onBarkOpen={() => openChanges('member', member.id)} onBarkDismiss={() => setDismissedBarks(value => ({ ...value, [bark.key]: true }))} onEnter={() => setOpenMemberId(member.id)} onSelect={() => setSelectedMemberId(member.id)} />
+          <MemberHome key={member.id} member={member} index={index} pose={poseFor(member, repository, seenNews)} bark={bark?.member.id === member.id ? bark : null} onBarkOpen={event => openChanges('member', member.id, event.currentTarget)} onBarkDismiss={() => setDismissedBarks(value => ({ ...value, [bark.key]: true }))} onEnter={() => setOpenMemberId(member.id)} onSelect={() => setSelectedMemberId(member.id)} />
         ))}
         <div className="map-seal" aria-hidden="true"><b>KNOWLEDGE</b><span>GUILD</span></div>
       </section>
-      {selectedMember && <CharacterMenu member={selectedMember} onClose={() => setSelectedMemberId(null)} onAsk={() => { setAnswerTarget({ scope: 'personal', member: selectedMember }); setSelectedMemberId(null) }} onHome={() => { setOpenMemberId(selectedMember.id); setSelectedMemberId(null) }} onSkills={() => { setSkillScope({ scope: 'member', memberId: selectedMember.id }); setSkillDetail(null); setShowSkills(true); setSelectedMemberId(null) }} onChanges={() => { openChanges('member', selectedMember.id); setSelectedMemberId(null) }} />}
+      {selectedMember && <CharacterMenu member={selectedMember} onClose={() => setSelectedMemberId(null)} onAsk={() => { setAnswerTarget({ scope: 'personal', member: selectedMember }); setSelectedMemberId(null) }} onHome={() => { setOpenMemberId(selectedMember.id); setSelectedMemberId(null) }} onSkills={() => { setSkillScope({ scope: 'member', memberId: selectedMember.id }); setSkillDetail(null); setShowSkills(true); setSelectedMemberId(null) }} onChanges={event => { openChanges('member', selectedMember.id, event.currentTarget); setSelectedMemberId(null) }} />}
       {openMember && <HouseInterior key={openMember.id} member={openMember} onClose={() => setOpenMemberId(null)} onAsk={member => { setOpenMemberId(null); setAnswerTarget({ scope: 'personal', member }) }} />}
       <AnswerPanel key={`${answerTarget.scope}-${answerTarget.member?.id || 'project'}`} target={answerTarget} docked onClose={() => setAnswerTarget({ scope: 'project' })} />
       {showSkills && <SkillStation skills={(snapshot.skills || []).filter(skill => skillScope.scope === 'member' ? skill.memberId === skillScope.memberId : skill.scope === 'project')} detail={skillDetail} onDetail={setSkillDetail} onClose={() => { setShowSkills(false); setSkillDetail(null) }} />}
