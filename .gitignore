@@ -1,0 +1,36 @@
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+~$*
+
+# Common generated caches
+node_modules/
+__pycache__/
+*.py[cod]
+
+# Personal raw sources stay local. Keep only structure documentation in Git.
+members/*/raw/**
+!members/*/raw/**/
+!members/*/raw/**/README.md
+!members/*/raw/**/.gitkeep
+
+# Optional private profile/context files stay local.
+members/*/PROFILE.private.md
+members/*/CONTEXT.private.md
+.vercel
+.env*
+!.env.example

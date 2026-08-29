@@ -1,0 +1,4 @@
+interface:
+  display_name: "Share Project Ideas"
+  short_description: "Capture, share, and review member ideas"
+  default_prompt: "Use $share-project-ideas to capture or share this project idea while preserving each member's independent perspective."

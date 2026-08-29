@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "installCommand": "npm --prefix apps/wiki-village ci",
+  "buildCommand": "npm --prefix apps/wiki-village run build",
+  "outputDirectory": "apps/wiki-village/dist",
+  "functions": {
+    "api/wiki-chat.mjs": {
+      "includeFiles": "apps/wiki-village/{server/wiki-evidence.json,src/data/wiki-snapshot.json}"
+    }
+  }
+}

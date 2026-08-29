@@ -1,0 +1,17 @@
+.git
+**/node_modules
+**/dist
+.env
+.env.*
+**/raw
+**/output
+**/.obsidian
+**/*.private.md
+**/*-clipper.json
+**/*template*.json
+members/**
+!members/*/
+!members/*/WIKI_SCHEMA.md
+!members/*/wiki/
+!members/*/wiki/**/*.md
+members/**/*.private.md

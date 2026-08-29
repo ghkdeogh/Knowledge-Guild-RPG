@@ -1,0 +1,26 @@
+{
+  "name": "knowledge-guild-rpg",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "snapshot": "node scripts/build-wiki-snapshot.mjs",
+    "predev": "npm run snapshot",
+    "prebuild": "npm run snapshot",
+    "dev": "vite",
+    "build": "vite build",
+    "test:snapshot": "node scripts/check-wiki-snapshot.mjs",
+    "test:chat": "node scripts/check-wiki-chat.mjs",
+    "test:deploy": "node scripts/check-vercel-deploy.mjs",
+    "test:layout": "node scripts/check-village-layout.mjs",
+    "test:guild": "node scripts/check-guild.mjs",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "openai": "^4.104.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "vite": "^5.4.10"
+  }
+}

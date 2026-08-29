@@ -1,0 +1,58 @@
+{
+  "version": 2,
+  "documents": [
+    {
+      "id": "member-example-member-members-example-member-WIKI-SCHEMA-md",
+      "memberId": "example-member",
+      "source": "members/example-member/WIKI_SCHEMA.md",
+      "title": "Example member Wiki schema",
+      "body": "# Example member Wiki schema\n\n## Purpose\n\nKeep small, evidence-linked notes separate from project common context and official decisions.\n\n## Structure\n\n- `wiki/index.md`: navigation\n- `wiki/notes/`: durable notes with status and source boundary\n- `wiki/log.md`: meaningful changes\n",
+      "scope": "personal"
+    },
+    {
+      "id": "member-example-member-members-example-member-wiki-index-md",
+      "memberId": "example-member",
+      "source": "members/example-member/wiki/index.md",
+      "title": "Example member Wiki index",
+      "body": "---\ntitle: Example member Wiki index\nstatus: draft\nupdated: 2026-08-29\n---\n\n# Example member Wiki\n\n- [Evidence boundary note](notes/evidence-boundary.md)\n- [Change log](log.md)\n",
+      "scope": "personal"
+    },
+    {
+      "id": "member-example-member-members-example-member-wiki-log-md",
+      "memberId": "example-member",
+      "source": "members/example-member/wiki/log.md",
+      "title": "Example member Wiki log",
+      "body": "---\ntitle: Example member Wiki log\nstatus: draft\nupdated: 2026-08-29\n---\n\n# Log\n\n- 2026-08-29: Created synthetic example fixture.\n",
+      "scope": "personal"
+    },
+    {
+      "id": "member-example-member-members-example-member-wiki-notes-evidence-boundary-md",
+      "memberId": "example-member",
+      "source": "members/example-member/wiki/notes/evidence-boundary.md",
+      "title": "Evidence boundary for a Guild reply",
+      "body": "---\ntitle: Evidence boundary for a Guild reply\nstatus: reviewed\nupdated: 2026-08-29\nscope: personal\n---\n\n# Evidence boundary for a Guild reply\n\n## Confirmed fact\n\nA Guild reply should cite only records supplied to its retrieval step.\n\n## Working hypothesis\n\nA short avatar response plus an evidence drawer can make a record's scope easier to inspect.\n\n## Limitation\n\nThis is synthetic example material, not a team decision or a statement about a real member.\n",
+      "scope": "personal"
+    },
+    {
+      "id": "project-context",
+      "scope": "project",
+      "source": "projects/PROJECT_CONTEXT.md",
+      "title": "Knowledge Guild RPG Project Context",
+      "body": "# Knowledge Guild RPG Project Context\n\n## Goal\n\nRepresent each permitted member Wiki as a data-based Guild avatar in a warm pixel village. The Mission Board explains common project context; Wiki-grounded dialogue, evidence navigation, and skills help users explore records without collapsing personal viewpoints into team decisions.\n\n## Core question\n\nHow can a member move from a Guild avatar to a short, evidence-bounded answer and its source records with clear scope boundaries?\n\n## Open extension\n\nThe project is designed for additional member directories, local deterministic retrieval, optional server-side LLM grounding, and open-source adaptation to other Wiki structures.\n\n## Current status\n\nThe final technology choices, role taxonomy, governance policy, and deployment policy are not decided. A public repository activity date may change a visual pose only; it does not describe a person's actual intent, availability, or personality.\n"
+    },
+    {
+      "id": "synthesis-index",
+      "scope": "synthesis",
+      "source": "synthesis/README.md",
+      "title": "Synthesis",
+      "body": "# Synthesis\n\nThis space holds comparison outputs and drafts from explicitly selected member perspectives. Nothing here is an official decision unless separately recorded in `decisions/` after explicit agreement.\n"
+    },
+    {
+      "id": "decision-state",
+      "scope": "decision",
+      "source": "decisions/README.md",
+      "title": "Decisions",
+      "body": "# Decisions\n\nRecord only decisions explicitly agreed by the relevant people, including date, approvers, evidence, alternatives, and status. No official decision is recorded yet.\n"
+    }
+  ]
+}

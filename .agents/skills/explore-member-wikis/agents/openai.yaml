@@ -1,0 +1,4 @@
+interface:
+  display_name: "Explore Member Wikis"
+  short_description: "Explore and compare selected member Wikis"
+  default_prompt: "Use $explore-member-wikis to inspect the selected members' Wikis and answer with clear attribution and evidence coverage."
