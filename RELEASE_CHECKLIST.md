@@ -2,7 +2,7 @@
 
 출시 담당자가 실제 환경에서 확인하는 짧은 목록입니다. 이 파일의 체크는 자동 배포 권한이나 라이선스 결정을 대신하지 않습니다.
 
-- [ ] **License chosen** — 소유자가 적절한 LICENSE를 선택하고 검토했다. 현재 저장소에는 LICENSE가 없다.
+- [x] **License chosen** — Apache License 2.0 (`Apache-2.0`)을 선택했고, 루트 `LICENSE`에 전문을 포함했다.
 - [ ] **Clean clone** — 새 clone에서 `cd apps/wiki-village`, `npm ci`가 성공한다.
 - [ ] **Full checks** — CI와 같은 non-live tests 및 `npm run build`가 성공한다.
 - [ ] **Quickstart** — `npm run quickstart`가 repository 밖 sample scaffold와 project/member query harness를 만든다.

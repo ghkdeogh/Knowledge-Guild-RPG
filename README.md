@@ -219,4 +219,4 @@ npm run build
 
 버그나 제안은 issue 또는 변경 목적과 테스트 결과가 담긴 pull request로 알려 주세요. 개인 자료는 member 공간에만 두고, 다른 사람의 member space와 raw/private/secrets는 읽거나 추가하지 않는 규칙을 지켜 주세요.
 
-아직 `LICENSE`를 선택하지 않았습니다. 따라서 이 저장소의 코드를 자유롭게 재사용·재배포할 수 있다고 주장하지 않습니다. 공개 배포 전에 프로젝트 소유자가 적절한 라이선스를 결정해야 합니다.
+이 프로젝트는 [Apache License 2.0](LICENSE)으로 제공됩니다. SPDX 식별자는 `Apache-2.0`이며, 전문은 루트 `LICENSE`에서 확인할 수 있습니다.
