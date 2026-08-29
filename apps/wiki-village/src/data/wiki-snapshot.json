@@ -1,5 +1,5 @@
 {
-  "version": 5,
+  "version": 6,
   "projectState": "PROJECT_UNINITIALIZED",
   "generatedAt": "onboarding-state",
   "boundary": "WIKI SNAPSHOT · compiled wiki records only · no raw/output/private/secrets",
@@ -11,5 +11,6 @@
   },
   "projectContext": null,
   "members": [],
+  "skills": [],
   "documents": []
 }

@@ -17,4 +17,7 @@ if (!app.includes("document.scope === scope") || !app.includes('documentsById.ge
 if (!css.includes('@media(max-width:800px)') || !css.includes('.room-content{display:block')) throw new Error('Responsive house interior guard is missing')
 if (!css.includes('.mission-board{') || !css.includes('.answer-panel{') || !css.includes('.source-drawer{')) throw new Error('Mission Board answer styling is missing')
 if (!css.includes('.onboarding-layer{') || !css.includes('.onboarding-card{') || !css.includes('@media(prefers-reduced-motion:no-preference)')) throw new Error('Accessible reduced-motion onboarding styling is missing')
+if (!app.includes('guild-prompt-dock') || !app.includes("/api/repository-status") || !app.includes('CharacterMenu') || !app.includes('SkillStation')) throw new Error('Guild prompt, repository projection, character menu, or skill station is missing')
+if (!app.includes('members/{member.id}/wiki/') || !app.includes('detail.readiness')) throw new Error('Scoped character action or non-executable skill disclosure is missing')
+if (!css.includes('.pose-crafting') || !css.includes('.pose-notice') || !css.includes('.guild-prompt-dock')) throw new Error('Repository pose or dock styles are missing')
 console.log('Validated full-viewport village, scoped Mission Board answers, safe source drawer, and responsive Wiki interiors.')

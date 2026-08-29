@@ -16,10 +16,10 @@ const getMemberDocuments = member => (member?.documentIds || [])
   .map(id => documentsById.get(id))
   .filter(document => document?.scope === 'personal' && document.memberId === member.id)
 
-function PixelAvatar({ member, tone, onEnter }) {
+function PixelAvatar({ member, tone, onEnter, onSelect, pose = 'neutral' }) {
   const role = member.role?.id || 'archivist'
   return (
-    <button className={`villager ${tone} role-${role}`} onClick={onEnter} aria-label={`${member.displayName}의 집에 들어가기`}>
+    <button className={`villager ${tone} role-${role} pose-${pose}`} onClick={onSelect || onEnter} aria-label={`${member.displayName}의 공개 Wiki 경로 상태 보기`}>
       <span className="villager-shadow" />
       <span className="villager-sprite" aria-hidden="true">
         <i className="villager-hair" /><i className="villager-face" />
@@ -31,7 +31,7 @@ function PixelAvatar({ member, tone, onEnter }) {
   )
 }
 
-function MemberHome({ member, index, onEnter }) {
+function MemberHome({ member, index, onEnter, onSelect, pose }) {
   const spot = homeSpots[index % homeSpots.length]
   const ring = Math.floor(index / homeSpots.length)
   const position = { left: `${Math.min(88, spot.x + ring * 2)}%`, top: `${Math.min(78, spot.y + ring * 2)}%` }
@@ -45,7 +45,7 @@ function MemberHome({ member, index, onEnter }) {
         <span className="window left" /><span className="window right" /><span className="door" />
         <span className="house-sign"><b>{member.displayName}</b><small>{count} WIKI</small></span>
       </button>
-      <PixelAvatar member={member} tone={tone} onEnter={onEnter} />
+      <PixelAvatar member={member} tone={tone} onEnter={onEnter} onSelect={onSelect} pose={pose} />
     </section>
   )
 }
@@ -130,7 +130,7 @@ const modeCopy = {
   error: '오류 · 답변 없음',
 }
 
-function MissionBoard({ onAskProject }) {
+function MissionBoard({ onAskProject, onRepositoryCheck, onSkills, repository }) {
   const context = snapshot.projectContext
   return (
     <aside className="mission-board" aria-label="Mission Board">
@@ -138,12 +138,13 @@ function MissionBoard({ onAskProject }) {
       <h1>공통 맥락에서 묻기</h1>
       <p>{context.goal || '프로젝트 공통 맥락을 확인합니다.'}</p>
       <dl><div><dt>범위</dt><dd>project · projects/</dd></div><div><dt>출처</dt><dd>{context.source}</dd></div></dl>
-      <button onClick={onAskProject}>프로젝트 기록에 질문</button>
+      <button onClick={onAskProject}>프로젝트 기록에 질문</button><button onClick={onSkills}>길드홀 스킬 보기</button><button className="repository-bell" onClick={onRepositoryCheck}>저장소 새 소식 확인</button>
+      {repository && <p className="repository-note" role="status">{repository.message} · {repository.branch || repository.mode} · project 변경 {(repository.project?.dirty || 0) + (repository.project?.remoteNews || 0)}</p>}
     </aside>
   )
 }
 
-function AnswerPanel({ target, onClose }) {
+function AnswerPanel({ target, onClose, docked = false }) {
   const scope = target?.scope || 'project'
   const member = target?.member || null
   const [question, setQuestion] = useState('')
@@ -212,8 +213,8 @@ function AnswerPanel({ target, onClose }) {
   const cited = (reply?.citations || []).map(safeCitation).filter(Boolean)
   const scopeLabel = scope === 'personal' ? `${member?.displayName} 개인 Wiki` : '프로젝트 공통 기록'
   return (
-    <section className="answer-panel" ref={panelRef} role="dialog" aria-modal="true" aria-labelledby="answer-title">
-      <header><div><small>TRACEABLE ANSWER</small><h2 id="answer-title">{scopeLabel}</h2><p>질문 범위는 잠겨 있으며, 이 패널은 다른 기록을 보충하지 않습니다.</p></div><button className="exit-button" onClick={closePanel} autoFocus>닫기</button></header>
+    <section className={`answer-panel${docked ? ' guild-prompt-dock' : ''}`} ref={panelRef} role={docked ? 'region' : 'dialog'} aria-modal={docked ? undefined : 'true'} aria-labelledby="answer-title">
+      <header><div><small>{docked ? 'GUILD PROMPT' : 'TRACEABLE ANSWER'}</small><h2 id="answer-title">{scopeLabel}</h2><p>질문 범위는 잠겨 있으며, 이 패널은 다른 기록을 보충하지 않습니다.</p></div>{!docked && <button className="exit-button" onClick={closePanel} autoFocus>닫기</button>}{docked && scope === 'personal' && <button className="exit-button" onClick={onClose}>프로젝트로</button>}</header>
       <div className="scope-lock"><b>Source scope</b><span>{scope === 'personal' ? `personal · members/${member?.id}/` : 'project · projects/'}</span></div>
       <form onSubmit={submit}><label htmlFor="guild-question">이 범위에서 확인할 질문</label><textarea id="guild-question" value={question} onChange={event => setQuestion(event.target.value)} maxLength="600" placeholder="기록 안에서 확인할 내용을 입력하세요." /><button type="submit" disabled={pending}>{pending ? '근거 확인 중…' : '근거로 답변 받기'}</button></form>
       {reply && <article className={`answer-card mode-${reply.mode}`}>
@@ -243,11 +244,32 @@ function VillageScenery() {
   )
 }
 
+const poseFor = (member, repository, seen) => {
+  const state = repository?.members?.[member.id]
+  if (state?.dirty) return 'crafting'
+  if (state?.remoteNews && state.remoteTip && seen?.[member.id] !== state.remoteTip) return 'notice'
+  return member.activity?.pose || 'neutral'
+}
+function CharacterMenu({ member, onAsk, onHome, onSkills, onChanges, onClose }) {
+  useEffect(() => { const close = event => event.key === 'Escape' && onClose(); window.addEventListener('keydown', close); return () => window.removeEventListener('keydown', close) }, [onClose])
+  return <aside className="character-menu" role="dialog" aria-label={`${member.displayName}의 공개 Wiki 경로 행동`}><b>{member.displayName} · 공개 Wiki 경로 상태</b><code>members/{member.id}/wiki/</code><button onClick={onAsk}>질문하기</button><button onClick={onHome}>Wiki 집 열기</button><button onClick={onSkills}>배치 스킬 보기</button><button onClick={onChanges}>저장소 변화 보기</button></aside>
+}
+function SkillStation({ skills, detail, onDetail, onClose }) {
+  return <aside className="skill-station" role="dialog" aria-modal="true" aria-label="배치된 Wiki 스킬"><button className="exit-button" onClick={onClose}>닫기</button><small>SKILL STATION</small><h2>배치된 harness</h2>{!skills.length && <p>아직 배치된 스킬이 없습니다. Wiki scaffold를 승인하면 이곳에 안전한 metadata만 놓입니다.</p>}{skills.map(skill => <button key={`${skill.scope}-${skill.memberId || 'project'}-${skill.id}`} className="skill-prop" onClick={() => onDetail(skill)}>{skill.scope === 'project' ? '길드홀' : skill.memberId} · {skill.id}</button>)}{detail && <article className="skill-detail"><h3>{detail.id}</h3><p>{detail.purpose}</p><code>{detail.allowedScope}</code><p>{detail.readiness}</p></article>}</aside>
+}
+
 function App() {
   const [openMemberId, setOpenMemberId] = useState(null)
-  const [answerTarget, setAnswerTarget] = useState(null)
+  const [answerTarget, setAnswerTarget] = useState({ scope: 'project' })
+  const [selectedMemberId, setSelectedMemberId] = useState(null)
+  const [repository, setRepository] = useState(null)
+  const [seenNews, setSeenNews] = useState(() => { try { const value = JSON.parse(localStorage.getItem('knowledge-guild-seen-news') || '{}'); return value && typeof value === 'object' && !Array.isArray(value) ? value : {} } catch { return {} } })
+  const [showSkills, setShowSkills] = useState(false); const [skillDetail, setSkillDetail] = useState(null); const [skillScope, setSkillScope] = useState({ scope: 'project', memberId: null })
   const [onboardingState, setOnboardingState] = useState(() => ({ persistenceMode: 'local-writable', phase: snapshot.projectState === 'VILLAGE_READY' ? 'VILLAGE_READY' : snapshot.projectState === 'PROJECT_READY' ? 'MEMBER_ONBOARDING' : 'PROJECT_UNINITIALIZED' }))
   const openMember = snapshot.members.find(member => member.id === openMemberId) || null
+  const selectedMember = snapshot.members.find(member => member.id === selectedMemberId) || null
+  const checkRepository = async () => { try { const response = await fetch('/api/repository-status', { method: 'POST' }); const result = await response.json(); setRepository(result); return result } catch { const result = { mode: 'error', message: '저장소 상태를 확인할 수 없습니다.', project: {} }; setRepository(result); return result } }
+  const markSeen = result => { const markers = Object.fromEntries(Object.entries(result?.members || {}).filter(([, value]) => value.remoteNews && value.remoteTip).map(([id, value]) => [id, value.remoteTip])); const next = { ...seenNews, ...markers }; setSeenNews(next); localStorage.setItem('knowledge-guild-seen-news', JSON.stringify(next)) }
 
   useEffect(() => {
     let active = true
@@ -261,14 +283,16 @@ function App() {
     <main className="village-app">
       <section className="village-map" aria-label="Knowledge Guild 마을">
         <VillageScenery />
-        <MissionBoard onAskProject={() => setAnswerTarget({ scope: 'project' })} />
+        <MissionBoard onAskProject={() => setAnswerTarget({ scope: 'project' })} onSkills={() => { setSkillScope({ scope: 'project', memberId: null }); setSkillDetail(null); setShowSkills(true) }} onRepositoryCheck={checkRepository} repository={repository} />
         {snapshot.members.map((member, index) => (
-          <MemberHome key={member.id} member={member} index={index} onEnter={() => setOpenMemberId(member.id)} />
+          <MemberHome key={member.id} member={member} index={index} pose={poseFor(member, repository, seenNews)} onEnter={() => setOpenMemberId(member.id)} onSelect={() => setSelectedMemberId(member.id)} />
         ))}
         <div className="map-seal" aria-hidden="true"><b>KNOWLEDGE</b><span>GUILD</span></div>
       </section>
+      {selectedMember && <CharacterMenu member={selectedMember} onClose={() => setSelectedMemberId(null)} onAsk={() => { setAnswerTarget({ scope: 'personal', member: selectedMember }); setSelectedMemberId(null) }} onHome={() => { setOpenMemberId(selectedMember.id); setSelectedMemberId(null) }} onSkills={() => { setSkillScope({ scope: 'member', memberId: selectedMember.id }); setSkillDetail(null); setShowSkills(true); setSelectedMemberId(null) }} onChanges={() => { checkRepository().then(markSeen); setSelectedMemberId(null) }} />}
       {openMember && <HouseInterior key={openMember.id} member={openMember} onClose={() => setOpenMemberId(null)} onAsk={member => { setOpenMemberId(null); setAnswerTarget({ scope: 'personal', member }) }} />}
-      {answerTarget && <AnswerPanel key={`${answerTarget.scope}-${answerTarget.member?.id || 'project'}`} target={answerTarget} onClose={() => setAnswerTarget(null)} />}
+      <AnswerPanel key={`${answerTarget.scope}-${answerTarget.member?.id || 'project'}`} target={answerTarget} docked onClose={() => setAnswerTarget({ scope: 'project' })} />
+      {showSkills && <SkillStation skills={(snapshot.skills || []).filter(skill => skillScope.scope === 'member' ? skill.memberId === skillScope.memberId : skill.scope === 'project')} detail={skillDetail} onDetail={setSkillDetail} onClose={() => { setShowSkills(false); setSkillDetail(null) }} />}
       <p className="sr-only" aria-live="polite">{openMember ? `${openMember.displayName}의 Wiki 집 내부` : '길드 마을'}</p>
     </main>
   )

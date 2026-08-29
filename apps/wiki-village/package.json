@@ -17,6 +17,7 @@
     "test:deploy": "node scripts/check-vercel-deploy.mjs",
     "test:layout": "node scripts/check-village-layout.mjs",
     "test:guild": "node scripts/check-guild.mjs",
+    "test:repository": "node scripts/check-repository-status.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

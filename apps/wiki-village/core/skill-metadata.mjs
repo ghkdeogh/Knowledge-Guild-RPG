@@ -1,0 +1,2 @@
+const compactHeading = (text, heading) => String(text || '').match(new RegExp(`^## ${heading}\\s*\\n([^\\r\\n]+)`, 'm'))?.[1]?.replace(/`[^`]*`/g, '').replace(/\s+/g, ' ').trim().slice(0, 160) || '명시되지 않음'
+export const safeSkillMetadata = ({ fileName, text, scope, memberId = null }) => ({ id: String(fileName).replace(/\.SKILL\.md$/i, ''), scope, memberId, purpose: compactHeading(text, 'Purpose and trigger'), allowedScope: compactHeading(text, 'Allowed scope'), readiness: '배치됨 · 아직 직접 실행 불가' })

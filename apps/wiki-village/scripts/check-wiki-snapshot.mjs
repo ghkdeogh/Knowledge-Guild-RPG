@@ -12,7 +12,7 @@ const firstSnapshot = await readFile(snapshotPath, 'utf8'); const firstEvidence 
 await build({})
 if (firstSnapshot !== await readFile(snapshotPath, 'utf8') || firstEvidence !== await readFile(evidencePath, 'utf8')) throw new Error('Snapshot output is not deterministic')
 const snapshot = JSON.parse(firstSnapshot); const evidence = JSON.parse(firstEvidence)
-if (snapshot.version < 4 || snapshot.projectState !== 'PROJECT_UNINITIALIZED' || snapshot.projectContext || snapshot.members.length || snapshot.documents.length || evidence.documents.length) throw new Error('Missing canonical context did not produce a clean PROJECT_UNINITIALIZED artifact')
+if (snapshot.version < 6 || snapshot.projectState !== 'PROJECT_UNINITIALIZED' || snapshot.projectContext || snapshot.members.length || snapshot.documents.length || evidence.documents.length || (snapshot.skills || []).length) throw new Error('Missing canonical context did not produce a clean PROJECT_UNINITIALIZED artifact')
 if (JSON.stringify(snapshot.manifest) !== JSON.stringify(evidence.manifest) || snapshot.manifest.recordCount !== 0) throw new Error('Uninitialized artifact manifest is invalid')
 if (/example-member/.test(`${firstSnapshot}\n${firstEvidence}`)) throw new Error('Example member leaked into production artifacts')
 const builder = await readFile(join(appRoot, 'scripts', 'build-wiki-snapshot.mjs'), 'utf8'); if (!builder.includes("'private'") || !builder.includes("'secrets'")) throw new Error('Private/secrets source exclusions are missing')
