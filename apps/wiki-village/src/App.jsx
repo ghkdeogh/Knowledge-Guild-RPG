@@ -19,7 +19,7 @@ const getMemberDocuments = member => (member?.documentIds || [])
 function PixelAvatar({ member, tone, onEnter, onSelect, pose = 'neutral' }) {
   const role = member.role?.id || 'archivist'
   return (
-    <button className={`villager ${tone} role-${role} pose-${pose}`} onClick={onSelect || onEnter} aria-label={`${member.displayName}의 공개 Wiki 경로 상태 보기`}>
+    <button className={`villager ${tone} role-${role} pose-${pose}`} onClick={() => onSelect?.()} aria-label={`${member.displayName}의 공개 Wiki 경로 상태 보기`}>
       <span className="villager-shadow" />
       <span className="villager-sprite" aria-hidden="true">
         <i className="villager-hair" /><i className="villager-face" />
@@ -213,7 +213,7 @@ function AnswerPanel({ target, onClose, docked = false }) {
   const cited = (reply?.citations || []).map(safeCitation).filter(Boolean)
   const scopeLabel = scope === 'personal' ? `${member?.displayName} 개인 Wiki` : '프로젝트 공통 기록'
   return (
-    <section className={`answer-panel${docked ? ' guild-prompt-dock' : ''}`} ref={panelRef} role={docked ? 'region' : 'dialog'} aria-modal={docked ? undefined : 'true'} aria-labelledby="answer-title">
+    <section className={`answer-panel${docked ? ' guild-prompt-dock' : ''}${reply ? ' has-answer' : ''}`} ref={panelRef} role={docked ? 'region' : 'dialog'} aria-modal={docked ? undefined : 'true'} aria-labelledby="answer-title">
       <header><div><small>{docked ? 'GUILD PROMPT' : 'TRACEABLE ANSWER'}</small><h2 id="answer-title">{scopeLabel}</h2><p>질문 범위는 잠겨 있으며, 이 패널은 다른 기록을 보충하지 않습니다.</p></div>{!docked && <button className="exit-button" onClick={closePanel} autoFocus>닫기</button>}{docked && scope === 'personal' && <button className="exit-button" onClick={onClose}>프로젝트로</button>}</header>
       <div className="scope-lock"><b>Source scope</b><span>{scope === 'personal' ? `personal · members/${member?.id}/` : 'project · projects/'}</span></div>
       <form onSubmit={submit}><label htmlFor="guild-question">이 범위에서 확인할 질문</label><textarea id="guild-question" value={question} onChange={event => setQuestion(event.target.value)} maxLength="600" placeholder="기록 안에서 확인할 내용을 입력하세요." /><button type="submit" disabled={pending}>{pending ? '근거 확인 중…' : '근거로 답변 받기'}</button></form>
