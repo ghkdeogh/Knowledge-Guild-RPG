@@ -11,6 +11,7 @@
     "build": "vite build",
     "test:snapshot": "node scripts/check-wiki-snapshot.mjs",
     "test:chat": "node scripts/check-wiki-chat.mjs",
+    "test:onboarding": "node scripts/check-onboarding.mjs",
     "test:deploy": "node scripts/check-vercel-deploy.mjs",
     "test:layout": "node scripts/check-village-layout.mjs",
     "test:guild": "node scripts/check-guild.mjs",

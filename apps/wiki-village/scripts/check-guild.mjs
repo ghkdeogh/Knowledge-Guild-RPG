@@ -11,6 +11,7 @@ const architectDocs = [{ id: 'b', title: 'Visual design concept', source: 'membe
 if (inferGuildRole(explorerDocs).id !== 'explorer' || inferGuildRole(architectDocs).id !== 'architect' || inferGuildRole([]).id !== 'archivist') throw new Error('Guild role inference/default failed')
 if (inferGuildRole(explorerDocs).evidenceId !== 'a' || inferGuildRole(architectDocs).evidenceId !== 'b') throw new Error('Guild role mixed cross-member evidence')
 if (!snapshot.members.every(member => member.role?.id && member.activity?.pose && member.role.evidenceSource.startsWith(`members/${member.id}/`))) throw new Error('Snapshot guild metadata is incomplete or crosses a member boundary')
+if (snapshot.projectState !== 'PROJECT_UNINITIALIZED' || snapshot.members.length || /example-member/.test(JSON.stringify(snapshot))) throw new Error('Initial snapshot is not an example-free uninitialized guild')
 const root = resolve(import.meta.dirname, '..')
 const app = await readFile(resolve(root, 'src/App.jsx'), 'utf8'); const css = await readFile(resolve(root, 'src/styles.css'), 'utf8')
 if (HEAD_OFFSET.x !== 1 || HEAD_OFFSET.y !== -37) throw new Error('Guild sprite anchor contract changed unexpectedly')

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import snapshot from './data/wiki-snapshot.json'
 import { isCurrentRequest } from './chat-request.js'
+import Onboarding from './Onboarding.jsx'
 
 const palette = ['sage', 'berry', 'ochre', 'lake', 'clay', 'plum', 'pine', 'sun']
 const homeSpots = [
@@ -245,7 +246,16 @@ function VillageScenery() {
 function App() {
   const [openMemberId, setOpenMemberId] = useState(null)
   const [answerTarget, setAnswerTarget] = useState(null)
+  const [onboardingState, setOnboardingState] = useState(() => ({ persistenceMode: 'local-writable', phase: snapshot.projectState === 'VILLAGE_READY' ? 'VILLAGE_READY' : snapshot.projectState === 'PROJECT_READY' ? 'MEMBER_ONBOARDING' : 'PROJECT_UNINITIALIZED' }))
   const openMember = snapshot.members.find(member => member.id === openMemberId) || null
+
+  useEffect(() => {
+    let active = true
+    fetch('/api/onboarding-state').then(response => response.ok ? response.json() : null).then(state => { if (active && state?.phase) setOnboardingState(state) }).catch(() => {})
+    return () => { active = false }
+  }, [])
+
+  if (onboardingState.phase !== 'VILLAGE_READY') return <main className="village-app"><Onboarding serverState={onboardingState} onStateChange={setOnboardingState} /></main>
 
   return (
     <main className="village-app">
