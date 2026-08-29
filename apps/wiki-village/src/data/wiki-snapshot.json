@@ -1,8 +1,14 @@
 {
+  "version": 3,
   "generatedAt": "2026-08-29T00:00:00.000Z",
   "sourceState": "indexed",
   "boundary": "WIKI SNAPSHOT · server-side LLM grounding when configured · explicit deterministic demo fallback · no browser filesystem access",
   "decisionState": "Official decisions are represented only by decisions/ documents.",
+  "manifest": {
+    "version": 1,
+    "recordCount": 7,
+    "contentDigest": "ec9456cb6b01b1c7b71cdd81f9a88082c3921534c8514060760d76880e7b6216"
+  },
   "projectContext": {
     "scope": "project",
     "source": "projects/PROJECT_CONTEXT.md",
@@ -59,6 +65,8 @@
       "title": "Example member Wiki schema",
       "updated": "snapshot",
       "status": "unclassified",
+      "knowledgeType": "wiki-record",
+      "contentDigest": "20a72b4a6ebbd71bd1ca272586fb1a06216cb72d2a44d2cf5ed4205d7dc22010",
       "excerpt": "Example member Wiki schema Purpose Keep small, evidence-linked notes separate from project common context and official decisions. Structure - wiki/index.md : navigation - wiki/notes/ : durable notes with status and source boundary"
     },
     {
@@ -71,6 +79,8 @@
       "title": "Example member Wiki index",
       "updated": "2026-08-29",
       "status": "draft",
+      "knowledgeType": "wiki-record",
+      "contentDigest": "bd41421826dcf86bec68c101fbc6d3e3270cf94505f1eb79c32cb345f1dd4361",
       "excerpt": "Example member Wiki - [Evidence boundary note](notes/evidence-boundary.md) - [Change log](log.md)"
     },
     {
@@ -83,6 +93,8 @@
       "title": "Example member Wiki log",
       "updated": "2026-08-29",
       "status": "draft",
+      "knowledgeType": "wiki-record",
+      "contentDigest": "ab770fb2ce9569509039cb49563d762b0e7cfe959e172184774ad531b5a9e188",
       "excerpt": "Log - 2026-08-29: Created synthetic example fixture."
     },
     {
@@ -95,6 +107,8 @@
       "title": "Evidence boundary for a Guild reply",
       "updated": "2026-08-29",
       "status": "reviewed",
+      "knowledgeType": "wiki-record",
+      "contentDigest": "a361d96df2259d7495ac2baf57bf941993f973e691f0188f9f91b580ce975518",
       "excerpt": "Evidence boundary for a Guild reply Confirmed fact A Guild reply should cite only records supplied to its retrieval step. Working hypothesis A short avatar response plus an evidence drawer can make a record's scope easier to inspe"
     },
     {
@@ -107,6 +121,8 @@
       "title": "Knowledge Guild RPG Project Context",
       "updated": "snapshot",
       "status": "unclassified",
+      "knowledgeType": "fact",
+      "contentDigest": "95803e436e11106e7968a8190536246e3a1a9ef11fdd4278374dbfc554ccd53f",
       "excerpt": "Knowledge Guild RPG Project Context Goal Represent each permitted member Wiki as a data-based Guild avatar in a warm pixel village. The Mission Board explains common project context; Wiki-grounded dialogue, evidence navigation, an"
     },
     {
@@ -119,6 +135,8 @@
       "title": "Synthesis",
       "updated": "snapshot",
       "status": "unclassified",
+      "knowledgeType": "hypothesis",
+      "contentDigest": "6bc8678e3445b5031de3b825e798c9b491caff46172369a2555eb48b024f7616",
       "excerpt": "Synthesis This space holds comparison outputs and drafts from explicitly selected member perspectives. Nothing here is an official decision unless separately recorded in decisions/ after explicit agreement."
     },
     {
@@ -131,6 +149,8 @@
       "title": "Decisions",
       "updated": "snapshot",
       "status": "no-recorded-decision",
+      "knowledgeType": "fact",
+      "contentDigest": "638b3d567712169cffc4ea0bcbc82c10a940c0261aec4b5164881a4224952748",
       "excerpt": "Decisions Record only decisions explicitly agreed by the relevant people, including date, approvers, evidence, alternatives, and status. No official decision is recorded yet."
     }
   ]

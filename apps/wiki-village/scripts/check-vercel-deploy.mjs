@@ -6,9 +6,9 @@ import { fileURLToPath } from 'node:url'
 const appRoot = resolve(fileURLToPath(new URL('..', import.meta.url)))
 const repoRoot = resolve(appRoot, '..', '..')
 const evidence = JSON.parse(await readFile(join(appRoot, 'server', 'wiki-evidence.json'), 'utf8'))
-if (!Array.isArray(evidence.documents) || !evidence.documents.length) throw new Error('Server evidence artifact is missing')
+if (evidence.version < 3 || !evidence.manifest?.contentDigest || !Array.isArray(evidence.documents) || !evidence.documents.length) throw new Error('Server evidence artifact is missing')
 for (const document of evidence.documents) {
-  if (!document.id || typeof document.body !== 'string' || (document.scope === 'personal' && !document.memberId)) throw new Error('Malformed server evidence artifact')
+  if (!document.id || typeof document.body !== 'string' || !document.contentDigest || !document.knowledgeType || (document.scope === 'personal' && !document.memberId)) throw new Error('Malformed server evidence artifact')
   const allowed = document.scope === 'personal' ? /^members\/[a-z0-9-]+\/(WIKI_SCHEMA\.md|wiki\/.*\.md)$/.test(document.source) : document.scope === 'project' ? document.source === 'projects/PROJECT_CONTEXT.md' : document.scope === 'synthesis' ? document.source === 'synthesis/README.md' : document.scope === 'decision' ? document.source === 'decisions/README.md' : false
   if (!allowed || /\.private\.md$|\/(raw|output|\.obsidian|node_modules)\//.test(document.source)) throw new Error(`Forbidden server evidence source: ${document.source}`)
 }
