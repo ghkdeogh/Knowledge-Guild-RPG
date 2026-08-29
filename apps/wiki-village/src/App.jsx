@@ -2,13 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import snapshot from './data/wiki-snapshot.json'
 import { isCurrentRequest } from './chat-request.js'
 import Onboarding from './Onboarding.jsx'
+import { homeSpots } from './village-layout.js'
 
 const palette = ['sage', 'berry', 'ochre', 'lake', 'clay', 'plum', 'pine', 'sun']
-const homeSpots = [
-  { x: 17, y: 23 }, { x: 72, y: 21 }, { x: 13, y: 61 }, { x: 76, y: 59 },
-  { x: 34, y: 70 }, { x: 55, y: 72 }, { x: 34, y: 15 }, { x: 57, y: 14 },
-  { x: 6, y: 39 }, { x: 84, y: 39 }, { x: 23, y: 74 }, { x: 68, y: 76 },
-]
 
 const documentsById = new Map(snapshot.documents.map(document => [document.id, document]))
 
