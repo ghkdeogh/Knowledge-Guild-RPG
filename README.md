@@ -45,13 +45,14 @@ React pixel UI projection
 - 승인 전에는 파일을 쓰지 않고, 승인 뒤에는 local writable mode에서 안전한 경로만 원자적으로 생성합니다.
 - `raw/`(원본), 컴파일된 `wiki/`, `output/`(결과물), index/log를 분리한 구조를 만듭니다.
 - 프로젝트 공통 기록 또는 한 멤버의 허용된 Wiki 기록에 질문하고, 인용·신뢰도·한계·모드를 함께 확인합니다.
-- 픽셀 마을에서 프로젝트 길드홀과 멤버별 Wiki 공간을 볼 수 있습니다.
+- 픽셀 마을에서 프로젝트 길드홀과 멤버별 Wiki 공간을 봅니다. 캐릭터를 선택해 scope를 고른 뒤 질문하면, 진행 중에는 해당 캐릭터의 answer bubble이, 완료 뒤에는 Answer Scroll과 allowlisted source citation이 표시됩니다.
+- repository status와 길드 연출은 허용된 공개 Wiki path의 상태를 표현할 뿐, 실제 사람의 활동·의도·가용성을 뜻하지 않습니다.
 
 ## 3분 시작하기
 
 ### 1) 준비물
 
-Node.js **18 이상**이 필요합니다. 이 저장소의 Vite 5 의존성은 `^18.0.0 || >=20.0.0`을 요구하며, 현재는 Node 24에서도 확인했습니다. Git도 설치되어 있으면 clone이 편합니다.
+Node.js **18.20 이상**이 필요합니다. 이 저장소의 Vite 5 의존성은 `^18.0.0 || >=20.0.0`을 요구하며, 현재는 Node 24에서도 확인했습니다. Git도 설치되어 있으면 clone이 편합니다.
 
 ### 2) 내려받고 실행하기
 
@@ -65,6 +66,16 @@ npm run dev -- --host 0.0.0.0
 터미널에 나온 `http://localhost:5173`은 **내 컴퓨터에서만** 여는 주소입니다. 같은 Wi-Fi의 다른 기기에서 보려면 `http://내-LAN-IP:5173`을 사용합니다. LAN에서는 분석과 파일 계획 미리보기까지만 가능하고, 실제 저장은 이 컴퓨터의 `localhost` 또는 CLI에서만 허용됩니다. 화면은 처음부터 이 제한을 표시합니다.
 
 AI provider는 선택 사항입니다. 사용하려면 `apps/wiki-village/.env.example`을 참고해 같은 폴더에 `.env`를 만들고 서버 전용 키를 넣습니다. `.env`와 API 키는 커밋하지 말고 `VITE_` 접두사에도 넣지 마세요. Architect는 항상 `mode`, `providerStatus`, 안전한 diagnostic을 표시합니다. 키 없음(`not-configured`), 응답 형식 오류(`malformed-response`), 네트워크 오류(`unavailable`), 기타 provider 실패(`failed`)는 **local draft**로 분명히 구분됩니다. 비용이 드는 연결 점검은 `KNOWLEDGE_GUILD_PROVIDER_SMOKE=1`과 키를 함께 설정한 뒤에만 `npm run test:provider-smoke`로 실행합니다.
+
+provider key 없이 scaffold 계약을 확인하려면 `apps/wiki-village`에서 `npm run quickstart`를 실행하세요. OS temp 아래에 검증용 새 scaffold를 만들고 경로를 JSON으로 출력합니다. 현재 checkout의 `projects/`와 `members/`는 건드리지 않습니다.
+
+출력된 임시 경로는 확인이 끝난 뒤 사용자가 직접 삭제합니다.
+
+```sh
+node scripts/release-quickstart.mjs --target <new-absolute-directory-outside-this-repository>
+```
+
+`--target`은 parent가 이미 존재하는 **아직 존재하지 않는 저장소 밖 절대 경로**여야 합니다. 상대 경로, 현재 checkout 안의 경로(또는 그곳으로 향하는 symlink/junction), 이미 존재하는 경로는 fail-closed로 거부됩니다.
 
 ## 첫 Wiki 만들기
 
@@ -152,9 +163,10 @@ projects/
   WIKI_BLUEPRINT.md        # 왜 이 구조인지, page type/routing/harness
   index/ · log/            # 공통 색인과 기록
 members/<member-id>/
-  CONTEXT.md               # 이 멤버가 확인한 최소 맥락
+  CONTEXT.md               # 로컬 최소 identity/context; public snapshot·evidence·citation 대상 아님
+  WIKI_SCHEMA.md           # 로컬 schema 설정; public snapshot·evidence·citation 대상 아님
   raw/                     # 불변 원본을 둘 계층
-  wiki/                    # AI가 컴파일해 유지할 Wiki 계층
+  wiki/                    # AI가 컴파일해 유지할 공개 개인 Wiki 계층
   output/                  # Wiki에서 만든 별도 결과물
   index/ · log/            # 멤버 범위 색인과 기록
   harnesses/               # 선택된 ingest/query/lint/reflect SKILL.md scaffold
@@ -164,13 +176,14 @@ members/<member-id>/
 
 ## 캐릭터와 길드 UI가 뜻하는 것
 
-중앙 **프로젝트 길드홀**은 `projects/`의 공통 맥락만 나타냅니다. 각 **캐릭터와 집**은 오직 해당 `members/{member-id}/`의 개인 Wiki 범위만 나타냅니다. 개인 관점은 자동으로 공통 사실이나 공식 결정이 되지 않습니다.
+중앙 **프로젝트 길드홀**은 `projects/`의 공통 맥락만 나타냅니다. 각 **캐릭터와 집**은 오직 해당 `members/{member-id}/wiki/**`의 공개 개인 Wiki 범위만 나타냅니다. `CONTEXT.md`와 `WIKI_SCHEMA.md`는 멤버를 식별·검증하는 로컬 설정이며 snapshot, evidence, citation source가 아닙니다. 개인 관점은 자동으로 공통 사실이나 공식 결정이 되지 않습니다.
 
 캐릭터의 포즈, 말풍선, 활동처럼 보이는 연출은 작업 이벤트를 읽기 쉽게 표시하는 중립적인 visual state입니다. 실제 사람의 상태, 의도, 온라인 여부, 가용성을 주장하지 않습니다.
 
 ## 보안과 데이터 경계
 
-- `.env`, API 키, `raw/`, `output/`, private profile/context, secrets는 브라우저 snapshot과 커밋 대상에서 제외합니다.
+- 공개 snapshot·evidence·citation 대상은 승인된 project Wiki와 `members/{member-id}/wiki/**`뿐입니다. member의 `CONTEXT.md`, `WIKI_SCHEMA.md`, `raw/`, `output/`, private profile/context, secrets는 그 대상이 아닙니다.
+- `.env`, API 키, project/member raw·output·private·secrets는 커밋하지 않습니다. `.gitignore`는 이 로컬 경계를 보호합니다.
 - 사용자의 원문, AI 제안, 승인된 blueprint를 구분합니다. 승인 전에는 canonical 파일을 만들지 않습니다.
 - local writable mode만 실제 repository 쓰기를 수행합니다. Vercel 같은 read-only 배포는 preview/export 화면일 뿐, 저장됐다고 말하지 않습니다.
 - member-id는 소문자·숫자·하이픈만 허용하며, 다른 멤버 공간이나 저장소 밖 경로로 쓰는 요청은 거부합니다.
@@ -184,24 +197,23 @@ members/<member-id>/
 npm run test:snapshot
 npm run test:chat
 npm run test:onboarding
-npm run test:provider-smoke # key + explicit opt-in 없으면 SKIP
 npm run test:deploy
 npm run test:layout
 npm run test:guild
+npm run test:repository
 npm run test:answer-bubbles
+npm run test:release-quickstart
 npm run build
 ```
 
-snapshot·chat·onboarding 검사는 scope, citation, local draft, 입력 검증, scaffold 충돌 같은 계약을 확인합니다. `npm run build`는 production 번들을 만듭니다.
+`test:provider-smoke`는 key와 명시적 opt-in이 있을 때만 별도로 실행하는 live smoke입니다. 나머지 명령과 quickstart는 provider credential·remote fetch 없이 local contract를 검증합니다. `npm run build`는 production 번들을 만듭니다.
 
 ## 현재 한계와 다음 작업
 
-- 실제 provider key를 넣은 end-to-end round trip은 아직 검증하지 않았습니다.
-- LAN URL에서는 의도적으로 분석·미리보기만 지원하며, 저장은 localhost/CLI로 제한합니다.
+- 실제 provider key를 넣은 live-provider end-to-end round trip은 아직 검증하지 않았습니다.
 - `ingest / query / lint / reflect`는 blueprint가 선택할 수 있는 scaffold/hook이며, 아직 실행 엔진은 아닙니다.
-- CLI 이벤트는 현재 동기 응답 JSONL입니다. 실시간 session stream과 replay는 후속 작업입니다.
-- 픽셀 캐릭터를 눌러 대화하는 기능과 guild news의 Git 변경 확인 UI는 후속 작업입니다.
-- GitHub 새 소식은 아직 기능이 아닙니다. 향후에는 **버튼 → `git fetch` → last-seen SHA 비교 → 허용된 Wiki path 분석 → 캐릭터 알림** 순서로 설계하며, 자동 `pull`은 하지 않습니다.
+- runtime snapshot 자동 갱신과 원격 변경의 자동 동기화는 아직 구현하지 않았습니다. local same-origin UI에서는 사용자가 누른 수동 저장소 확인만 `git fetch --prune`을 요청할 수 있으며, 자동 `pull`은 하지 않습니다.
+- session replay와 persistence는 아직 제공하지 않습니다. CLI 이벤트는 현재 동기 응답 JSONL입니다.
 
 ## 기여 방법과 라이선스
 

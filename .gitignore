@@ -28,7 +28,27 @@ members/*/raw/**
 !members/*/raw/**/README.md
 !members/*/raw/**/.gitkeep
 
-# Optional private profile/context files stay local.
+# Personal outputs stay local. Keep only structure documentation in Git.
+members/*/output/**
+!members/*/output/**/
+!members/*/output/**/README.md
+!members/*/output/**/.gitkeep
+
+# Project raw sources and generated outputs follow the same local-only boundary.
+projects/raw/**
+!projects/raw/**/
+!projects/raw/**/README.md
+!projects/raw/**/.gitkeep
+projects/output/**
+!projects/output/**/
+!projects/output/**/README.md
+!projects/output/**/.gitkeep
+
+# Private and secret project/member data stays local.
+projects/private/**
+projects/secrets/**
+members/*/private/**
+members/*/secrets/**
 members/*/PROFILE.private.md
 members/*/CONTEXT.private.md
 .vercel

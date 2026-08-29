@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  wiki-village:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: apps/wiki-village
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/wiki-village/package-lock.json
+      - run: npm ci
+      - run: npm run test:snapshot
+      - run: npm run test:chat
+      - run: npm run test:onboarding
+      - run: npm run test:deploy
+      - run: npm run test:layout
+      - run: npm run test:guild
+      - run: npm run test:repository
+      - run: npm run test:answer-bubbles
+      - run: npm run test:release-quickstart
+      - run: npm run build
+      - run: git diff --exit-code -- src/data/wiki-snapshot.json server/wiki-evidence.json

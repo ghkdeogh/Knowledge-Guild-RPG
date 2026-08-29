@@ -2,6 +2,9 @@
   "name": "knowledge-guild-rpg",
   "private": true,
   "version": "0.1.0",
+  "engines": {
+    "node": ">=18.20"
+  },
   "type": "module",
   "scripts": {
     "snapshot": "node scripts/build-wiki-snapshot.mjs",
@@ -13,12 +16,14 @@
     "test:chat": "node scripts/check-wiki-chat.mjs",
     "test:onboarding": "node scripts/check-onboarding.mjs",
     "test:provider-smoke": "node scripts/check-provider-smoke.mjs",
+    "quickstart": "node scripts/release-quickstart.mjs --temp",
     "wiki-architect": "node scripts/wiki-architect.mjs",
     "test:deploy": "node scripts/check-vercel-deploy.mjs",
     "test:layout": "node scripts/check-village-layout.mjs",
     "test:guild": "node scripts/check-guild.mjs",
     "test:answer-bubbles": "node scripts/check-answer-bubbles.mjs",
     "test:repository": "node scripts/check-repository-status.mjs",
+    "test:release-quickstart": "node scripts/check-release-quickstart.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
