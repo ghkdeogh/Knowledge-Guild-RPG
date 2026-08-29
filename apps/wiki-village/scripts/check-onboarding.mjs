@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { analyzeProject, localDraft } from '../server/project-wiki-architect.mjs'
 import { onboardingMiddleware, previewBlueprint, saveBlueprint } from '../server/onboarding.mjs'
 import { runWikiArchitect } from '../core/wiki-architect.mjs'
+import { isRenderableBlueprint } from '../src/blueprint-shape.mjs'
 
 const appRoot = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const statement = '학습 팀이 기술 실험을 정리하고 반복 가능한 교육 결과를 만들고 싶다.'
@@ -20,6 +21,8 @@ const root = await mkdtemp(join(tmpdir(), 'knowledge-guild-architect-'))
 try {
   await mkdir(join(root, 'projects'), { recursive: true }); await mkdir(join(root, 'members'), { recursive: true })
   const learning = localDraft(statement); const market = localDraft('시장 신호와 경쟁 기업을 분석해 투자 가설의 결론을 만들고 싶다.'); const creative = localDraft('창작 세계관과 캐릭터, 플롯을 정리해 소설 산출물을 만들고 싶다.')
+  expect(isRenderableBlueprint(learning.blueprint), 'A valid blueprint is not renderable')
+  for (const malformedBlueprint of [{ ...learning.blueprint, sourceCategories: 'raw/docs' }, { ...learning.blueprint, outputTypes: { id: 'notes' } }, { ...learning.blueprint, brief: { ...learning.blueprint.brief, knownFacts: 'fact' } }]) expect(!isRenderableBlueprint(malformedBlueprint), 'Malformed advanced JSON shape was accepted')
   const domainPlans = []
   for (const [draft, page] of [[learning, 'technical'], [market, 'market'], [creative, 'world']]) { expect(draft.nextQuestion === null || typeof draft.nextQuestion === 'string', 'Clarification contract is invalid'); expect(draft.blueprint.pageTypes.some(item => item.id === page), `${page} domain routing failed`); const files = previewBlueprint({ blueprint: draft.blueprint, identity: { memberId: `member-${page}`, displayName: '검토자', workingContext: '승인한 범위를 검토합니다.' } }).files; const harness = files.find(file => file.path.endsWith('harnesses/ingest.SKILL.md')); expect(harness && ['Purpose and trigger', 'Allowed scope', 'Workflow', 'Routing rules', 'Approval and knowledge boundary', 'Index and log contract', 'Output contract', 'Reject rules', 'Example and verification'].every(heading => harness.content.includes(heading)), 'Harness contract is incomplete'); expect(!harness.content.includes(statement), 'Harness stored raw input'); domainPlans.push(JSON.stringify({ pages: draft.blueprint.pageTypes, sources: draft.blueprint.sourceCategories, outputs: draft.blueprint.outputTypes, harnesses: draft.blueprint.harnesses })) }
   expect(new Set(domainPlans).size === 3, 'Three project fixtures did not produce distinct page/source/output/harness plans')
