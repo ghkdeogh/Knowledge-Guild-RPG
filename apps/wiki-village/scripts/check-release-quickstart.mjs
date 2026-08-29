@@ -29,9 +29,7 @@ try {
   await runCli(['--target', explicitTarget]).then(() => { throw new Error('Existing target was accepted') }, error => expect(error.stderr.includes('release-target-exists'), 'Existing target failed with the wrong safety code'))
   await runCli(['--target', 'relative-target']).then(() => { throw new Error('Relative target was accepted') }, error => expect(error.stderr.includes('release-target-absolute'), 'Relative target failed with the wrong safety code'))
   await runCli(['--target', appRoot]).then(() => { throw new Error('Workspace target was accepted') }, error => expect(error.stderr.includes('release-target-workspace'), 'Workspace target failed with the wrong safety code'))
-  if (process.platform === 'win32') {
   if (process.platform === 'win32') await runCli(['--target', appRoot.toUpperCase()]).then(() => { throw new Error('Case-variant workspace target was accepted') }, error => expect(error.stderr.includes('release-target-workspace'), 'Case-variant workspace target failed with the wrong safety code'))
-  }
   const link = join(linkParent, 'workspace-link'); await symlink(appRoot, link, process.platform === 'win32' ? 'junction' : 'dir'); await runCli(['--target', join(link, 'escaped-sample')]).then(() => { throw new Error('Symlinked workspace target was accepted') }, error => expect(error.stderr.includes('release-target-workspace'), 'Symlinked workspace target failed with the wrong safety code'))
   const failedTarget = join(parent, 'failed-sample')
   await createReleaseQuickstart({ target: failedTarget, run: async (command, payload, options) => {
