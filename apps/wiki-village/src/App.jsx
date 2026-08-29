@@ -30,7 +30,7 @@ function PixelAvatar({ member, tone, onEnter, onSelect, pose = 'neutral' }) {
 
 function RepositoryBark({ bark, onOpen, onDismiss }) {
   if (!bark) return null
-  return <aside className="repository-bark" aria-label="공개 Wiki 경로 상태"><button onClick={onOpen}>{bark.state.message}<small>공개 Wiki 경로 상태 보기</small></button><button className="bark-dismiss" onClick={onDismiss} aria-label="이 경로 상태 말풍선 닫기">×</button></aside>
+  return <aside className="repository-bark" role="status" aria-live="polite" aria-label="공개 Wiki 경로 상태"><button onClick={onOpen}>{bark.state.message}<small>공개 Wiki 경로 상태 보기</small></button><button className="bark-dismiss" onClick={onDismiss} aria-label="이 경로 상태 말풍선 닫기">×</button></aside>
 }
 
 function MemberHome({ member, index, onEnter, onSelect, pose, bark, onBarkOpen, onBarkDismiss }) {
@@ -264,7 +264,8 @@ function RepositoryChanges({ repository, scope, member, seenNews, onConfirm, onC
   const dirty = (repository?.dirty || []).filter(includesScope); const remote = (repository?.remoteNews || []).filter(includesScope)
   const state = scope === 'member' && memberId ? repository?.members?.[memberId] : null
   const unseen = state?.remoteNews && state.remoteTip && seenNews[memberId] !== state.remoteTip
-  return <aside className="repository-changes" role="dialog" aria-modal="true" aria-label={`${scopeLabel} 공개 Wiki 경로 변화`}><header><div><small>REPOSITORY CHANGES</small><h2>{scopeLabel}</h2><p>원문 diff 없이 허용된 공개 Wiki 경로 metadata만 표시합니다.</p></div><button className="exit-button" onClick={onClose} autoFocus>닫기</button></header><dl><div><dt>branch</dt><dd>{repository?.branch || repository?.mode || '확인 전'}</dd></div><div><dt>ahead / behind</dt><dd>{repository?.ahead || 0} / {repository?.behind || 0}{repository?.diverged ? ' · diverged' : ''}</dd></div><div><dt>fetch</dt><dd>{repository?.fetch?.outcome || 'not-requested'}</dd></div></dl><section><h3>로컬 작성 중</h3>{dirty.length ? <ul>{dirty.map(item => <li key={item.path}><code>{item.path}</code></li>)}</ul> : <p>표시할 로컬 공개 경로 변경이 없습니다.</p>}</section><section><h3>원격 새 기록</h3>{remote.length ? <ul>{remote.map(item => <li key={item.path}><code>{item.path}</code></li>)}</ul> : <p>표시할 원격 공개 경로 변경이 없습니다.</p>}</section>{unseen && <button className="confirm-news" onClick={onConfirm}>새 기록 확인</button>}</aside>
+  const unavailable = !repository || repository.mode === 'error' || repository.mode === 'unavailable'
+  return <aside className="repository-changes" role="dialog" aria-modal="true" aria-label={`${scopeLabel} 공개 Wiki 경로 변화`}><header><div><small>REPOSITORY CHANGES</small><h2>{scopeLabel}</h2><p>원문 diff 없이 허용된 공개 Wiki 경로 metadata만 표시합니다.</p></div><button className="exit-button" onClick={onClose} autoFocus>닫기</button></header>{unavailable && <p>아직 저장소 상태를 확인하지 못했습니다. Mission Board의 저장소 새 소식 확인을 사용하세요.</p>}<dl><div><dt>branch</dt><dd>{repository?.branch || repository?.mode || '확인 전'}</dd></div><div><dt>ahead / behind</dt><dd>{repository?.ahead || 0} / {repository?.behind || 0}{repository?.diverged ? ' · diverged' : ''}</dd></div><div><dt>fetch</dt><dd>{repository?.fetch?.outcome || 'not-requested'}</dd></div></dl><section><h3>로컬 작성 중</h3>{dirty.length ? <ul>{dirty.map(item => <li key={item.path}><code>{item.path}</code></li>)}</ul> : <p>표시할 로컬 공개 경로 변경이 없습니다.</p>}</section><section><h3>원격 새 기록</h3>{remote.length ? <ul>{remote.map(item => <li key={item.path}><code>{item.path}</code></li>)}</ul> : <p>표시할 원격 공개 경로 변경이 없습니다.</p>}</section>{unseen && <button className="confirm-news" onClick={onConfirm}>새 기록 확인</button>}</aside>
 }
 
 function App() {
