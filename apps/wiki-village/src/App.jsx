@@ -1,49 +1,158 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import snapshot from './data/wiki-snapshot.json'
-import { isCurrentRequest } from './chat-request'
-import { activityDescription, HEAD_OFFSET } from './guild'
 
-const memberList = snapshot.members || []
-const scopes = { personal: '개인 Wiki', project: '프로젝트 공통 맥락', synthesis: '종합 초안', decision: '공식 결정' }
-const colors = ['teal', 'violet', 'amber', 'moss', 'teal', 'violet']
+const palette = ['sage', 'berry', 'ochre', 'lake', 'clay', 'plum', 'pine', 'sun']
+const homeSpots = [
+  { x: 17, y: 23 }, { x: 72, y: 21 }, { x: 13, y: 61 }, { x: 76, y: 59 },
+  { x: 34, y: 70 }, { x: 55, y: 72 }, { x: 34, y: 15 }, { x: 57, y: 14 },
+  { x: 6, y: 39 }, { x: 84, y: 39 }, { x: 23, y: 74 }, { x: 68, y: 76 },
+]
+
 const documentsById = new Map(snapshot.documents.map(document => [document.id, document]))
-const members = Object.fromEntries(memberList.map((base, index) => {
-  const count = Math.max(memberList.length, 1); const angle = Math.PI + index / count * Math.PI * 2
-  const home = { x: Math.round(480 + Math.cos(angle) * 306), y: Math.round(336 + Math.sin(angle) * 130) }
-  const plaza = { x: 436 + (index % 3) * 42, y: 354 + (Math.floor(index / 3) % 2) * 30 }
-  return [base.id, { ...base, label: base.displayName, color: colors[index % colors.length], home, plaza, route: [home, { x: Math.round((home.x + plaza.x) / 2), y: 346 }, plaza] }]
-}))
-const getDoc = id => documentsById.get(id)
-const head = point => ({ x: point.x + HEAD_OFFSET.x, y: point.y + HEAD_OFFSET.y })
-const pointOnPath = (points, progress, reverse = false) => { const path = reverse ? [...points].reverse() : points; const distances = path.slice(1).map((point, index) => Math.hypot(point.x - path[index].x, point.y - path[index].y)); const total = distances.reduce((sum, distance) => sum + distance, 0); let remaining = total * Math.max(0, Math.min(1, progress)); for (let index = 0; index < distances.length; index += 1) { if (remaining <= distances[index]) { const ratio = remaining / distances[index]; const start = path[index]; const end = path[index + 1]; return { x: start.x + (end.x - start.x) * ratio, y: start.y + (end.y - start.y) * ratio, dx: end.x - start.x, dy: end.y - start.y } } remaining -= distances[index] } return { ...path.at(-1), dx: 0, dy: 1 } }
-const facing = point => Math.abs(point.dx) > Math.abs(point.dy) ? (point.dx > 0 ? 'right' : 'left') : (point.dy > 0 ? 'down' : 'up')
-const retrieve = (member, query = '') => { if (!member) return []; const terms = query.toLowerCase().split(/\s+/).filter(term => term.length > 1); return member.documentIds.map(getDoc).filter(Boolean).map(document => ({ document, score: terms.reduce((sum, term) => sum + (document.title.toLowerCase().includes(term) ? 5 : 0) + (document.excerpt.toLowerCase().includes(term) ? 1 : 0), 0) })).sort((a, b) => b.score - a.score || a.document.source.localeCompare(b.document.source)).map(item => item.document) }
-function planMeeting(question, primary) { const candidate = memberList.find(member => member.id !== primary); const candidateDoc = candidate && retrieve(members[candidate.id], question)[0]; const composite = /(비교|연결|공백|검증|함께)/.test(question); const score = candidateDoc && composite ? { relevance: .82, novelty: .66, disagreement: .18, speaks: true, reason: `「${candidateDoc.title}」의 별도 근거가 질문과 연결됩니다.` } : { relevance: candidateDoc ? .28 : 0, novelty: candidateDoc ? .22 : 0, disagreement: .1, speaks: false, reason: '추가 근거가 참여 기준에 닿지 않습니다.' }; return { question, primary, optional: score.speaks ? candidate?.id || null : null, score } }
-function actorState(member, meeting, elapsed, answerElapsed, skill, selected, compareTargets) {
-  const idle = () => ({ point: member.home, mode: member.activity?.pose || 'idle', direction: 'down' })
-  if (meeting && [meeting.primary, meeting.optional].includes(member.id)) { if (elapsed < 2600) { const point = pointOnPath(member.route, elapsed / 2600); return { point, mode: 'walk', direction: facing(point) } } if (answerElapsed < 0) return { point: member.plaza, mode: member.id === meeting.primary ? 'think' : 'listen', direction: 'left' }; if (answerElapsed < 3700) return { point: member.plaza, mode: member.id === meeting.primary ? 'talk' : 'listen', direction: member.id === meeting.primary ? 'right' : 'left' }; if (answerElapsed < 6200) { const point = pointOnPath(member.route, (answerElapsed - 3700) / 2500, true); return { point, mode: 'walk', direction: facing(point) } }; return idle() }
-  if (skill === 'compare' && compareTargets.includes(member.id)) { const slot = compareTargets.indexOf(member.id); return { point: { x: 438 + slot * 78, y: 353 }, mode: 'exchange', direction: slot ? 'left' : 'right' } }
-  if (member.id === selected) { if (skill === 'explore') return { point: { x: 755, y: 180 }, mode: 'read', direction: 'left' }; if (skill === 'connect') return { point: { x: 480, y: 246 }, mode: 'map', direction: 'down' }; if (skill === 'verify') return { point: member.home, mode: 'verify', direction: 'down' }; if (skill === 'synthesis') return { point: member.plaza, mode: 'craft', direction: 'right' } }
-  return idle()
-}function Avatar({ member, actor, selected, frame, onSelect }) { const role = member.role?.id || 'archivist'; return <button className={`avatar guild-avatar ${member.color} role-${role} ${actor.mode} facing-${actor.direction} frame-${frame} ${selected ? 'selected' : ''}`} style={{ '--x': `${actor.point.x}px`, '--y': `${actor.point.y}px` }} onClick={() => onSelect(member.id)} aria-label={`${member.label} Wiki 기록 기반 길드 아바타 선택`}><i className="shadow" /><i className="sprite"><b className="hair" /><b className="hood" /><b className="head"><em className="eye a" /><em className="eye b" /><em className="mouth" /></b><b className="body" /><b className="tabard" /><b className="arm a" /><b className="arm b" /><b className="tool" /><b className="leg a" /><b className="leg b" /><b className="boot a" /><b className="boot b" /></i><span>{member.label}</span></button> }function Bubble({ member, reply, point, onOpenLedger }) { const anchor = head(point); return <div className={`bubble ${member.color}`} style={{ left: `${anchor.x}px`, bottom: `${576 - (anchor.y - 16)}px` }} role="status"><strong>{member.label}</strong><small>{scopes[reply.sourceScope] || reply.sourceScope} · {reply.confidence}</small><p>{reply.answer}</p><button onClick={onOpenLedger}>근거 {reply.citations?.length || 0} · Ledger</button></div> }
-function GuildCard({ member, onClose, onAsk }) { if (!member) return null; const role = member.role || { label: '기록관', tool: '책 · 깃펜', evidenceTitle: '인덱싱된 Wiki 문서 없음', evidenceCategory: '개인 Wiki', evidenceSource: '' }; return <aside className="guild-card" aria-label={`${member.id} 길드 기록 카드`}><header><div><p>GUILD RECORD</p><h2>{member.id}</h2></div><button onClick={onClose}>닫기 ×</button></header><strong>Wiki 기록 기반 길드 역할 · {role.label}</strong><span>장착 도구 · {role.tool}</span><small>{activityDescription(member.activity)}</small><em>실제 상태나 의도를 의미하지 않습니다.</em><div><b>역할 근거</b><span>{role.evidenceTitle}</span><small>{role.evidenceCategory} · {role.evidenceSource || '근거 기록 없음'}</small></div><button className="guild-card-action" onClick={onAsk}>이 기록에 질문하기 ↗</button></aside> }
+
+const getMemberDocuments = member => (member?.documentIds || [])
+  .map(id => documentsById.get(id))
+  .filter(document => document?.scope === 'personal' && document.memberId === member.id)
+
+function PixelAvatar({ member, tone, onEnter }) {
+  const role = member.role?.id || 'archivist'
+  return (
+    <button className={`villager ${tone} role-${role}`} onClick={onEnter} aria-label={`${member.displayName}의 집에 들어가기`}>
+      <span className="villager-shadow" />
+      <span className="villager-sprite" aria-hidden="true">
+        <i className="villager-hair" /><i className="villager-face" />
+        <i className="villager-body" /><i className="villager-apron" />
+        <i className="villager-arm left" /><i className="villager-arm right" />
+        <i className="villager-leg left" /><i className="villager-leg right" />
+      </span>
+    </button>
+  )
+}
+
+function MemberHome({ member, index, onEnter }) {
+  const spot = homeSpots[index % homeSpots.length]
+  const ring = Math.floor(index / homeSpots.length)
+  const position = { left: `${Math.min(88, spot.x + ring * 2)}%`, top: `${Math.min(78, spot.y + ring * 2)}%` }
+  const tone = palette[index % palette.length]
+  const count = getMemberDocuments(member).length
+
+  return (
+    <section className={`home-plot ${tone}`} style={position} aria-label={`${member.displayName}의 Wiki 집`}>
+      <button className="pixel-house" onClick={onEnter} aria-label={`${member.displayName}의 집, Wiki 문서 ${count}개`}>
+        <span className="chimney" /><span className="roof" /><span className="wall" />
+        <span className="window left" /><span className="window right" /><span className="door" />
+        <span className="house-sign"><b>{member.displayName}</b><small>{count} WIKI</small></span>
+      </button>
+      <PixelAvatar member={member} tone={tone} onEnter={onEnter} />
+    </section>
+  )
+}
+
+function BookIcon({ tone = 0 }) {
+  return <span className={`book-icon tone-${tone % 4}`} aria-hidden="true"><i /><i /><i /></span>
+}
+
+function HouseInterior({ member, onClose }) {
+  const documents = useMemo(() => getMemberDocuments(member), [member])
+  const [query, setQuery] = useState('')
+  const [selectedId, setSelectedId] = useState(documents[0]?.id || '')
+  const filteredDocuments = documents.filter(document => `${document.title} ${document.excerpt} ${document.category}`.toLowerCase().includes(query.toLowerCase()))
+  const selectedDocument = documents.find(document => document.id === selectedId) || filteredDocuments[0] || null
+
+  useEffect(() => {
+    const closeOnEscape = event => { if (event.key === 'Escape') onClose() }
+    window.addEventListener('keydown', closeOnEscape)
+    return () => window.removeEventListener('keydown', closeOnEscape)
+  }, [onClose])
+
+  return (
+    <section className="interior-layer" role="dialog" aria-modal="true" aria-labelledby="interior-title">
+      <div className="room-sky" />
+      <div className="interior-room">
+        <header className="room-header">
+          <div className="resident-mark" aria-hidden="true"><PixelAvatar member={member} tone="sage" onEnter={() => {}} /></div>
+          <div><small>WIKI HOUSE</small><h1 id="interior-title">{member.displayName}</h1></div>
+          <button className="exit-button" onClick={onClose} autoFocus><span aria-hidden="true">←</span> 마을</button>
+        </header>
+
+        <div className="room-content">
+          <aside className="wiki-shelf" aria-label="Wiki 문서 서가">
+            <label className="shelf-search">
+              <span className="sr-only">Wiki 검색</span>
+              <input value={query} onChange={event => setQuery(event.target.value)} placeholder="서가 검색…" />
+              <i aria-hidden="true">⌕</i>
+            </label>
+            <div className="shelf-label"><span>WIKI SHELF</span><b>{filteredDocuments.length}</b></div>
+            <div className="book-list">
+              {filteredDocuments.map((document, index) => (
+                <button key={document.id} className={selectedDocument?.id === document.id ? 'selected' : ''} onClick={() => setSelectedId(document.id)}>
+                  <BookIcon tone={index} />
+                  <span><b>{document.title}</b><small>{document.category}</small></span>
+                </button>
+              ))}
+              {!filteredDocuments.length && <p className="empty-shelf">일치하는 기록이 없습니다.</p>}
+            </div>
+          </aside>
+
+          <main className="reading-desk">
+            <span className="window-light" aria-hidden="true" />
+            {selectedDocument ? (
+              <article className="wiki-page">
+                <header>
+                  <span>{selectedDocument.category}</span>
+                  <time>{selectedDocument.updated}</time>
+                </header>
+                <h2>{selectedDocument.title}</h2>
+                <p>{selectedDocument.excerpt}</p>
+                <footer>
+                  <span className="source-gem" aria-hidden="true" />
+                  <div><small>SOURCE</small><code>{selectedDocument.source}</code></div>
+                </footer>
+              </article>
+            ) : (
+              <div className="empty-desk"><BookIcon /><h2>아직 놓인 기록이 없습니다.</h2></div>
+            )}
+            <div className="desk-props" aria-hidden="true"><i className="mug" /><i className="plant" /><i className="lamp-glow" /></div>
+          </main>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function VillageScenery() {
+  return (
+    <>
+      <div className="water north" /><div className="water south" />
+      <svg className="village-paths" viewBox="0 0 1440 900" preserveAspectRatio="none" aria-hidden="true">
+        <path d="M720 450 C520 410 390 265 245 225 M720 450 C925 390 1010 245 1110 215 M720 450 C500 500 335 605 195 670 M720 450 C940 510 1060 610 1170 670" />
+        <path d="M720 0 L720 900" /><path d="M0 450 L1440 450" />
+      </svg>
+      <div className="guild-hall" aria-hidden="true"><i className="hall-flag" /><i className="hall-roof" /><i className="hall-wall" /><i className="hall-door" /><b>WIKI³</b></div>
+      <div className="well" aria-hidden="true"><i /><b /></div>
+      {Array.from({ length: 18 }, (_, index) => <i key={index} className={`map-tree tree-${index + 1}`} aria-hidden="true" />)}
+      {Array.from({ length: 12 }, (_, index) => <i key={index} className={`wildflower flower-${index + 1}`} aria-hidden="true" />)}
+    </>
+  )
+}
+
 function App() {
-  const [selected, setSelected] = useState(memberList[0]?.id || ''); const [question, setQuestion] = useState(''); const [questionScope, setQuestionScope] = useState('personal'); const [reply, setReply] = useState(null); const [loading, setLoading] = useState(false); const [meeting, setMeeting] = useState(null); const [startedAt, setStartedAt] = useState(0); const [now, setNow] = useState(0); const [ledgerOpen, setLedgerOpen] = useState(false); const [ledgerScope, setLedgerScope] = useState('personal'); const [skill, setSkill] = useState(''); const [compareTargets, setCompareTargets] = useState([]); const [draftOpen, setDraftOpen] = useState(false); const [boardOpen, setBoardOpen] = useState(false); const [dockOpen, setDockOpen] = useState(false); const [guildOpen, setGuildOpen] = useState(false); const timer = useRef(0); const requestId = useRef(0); const abort = useRef(null)
-  useEffect(() => { if (!meeting) return undefined; const tick = () => { setNow(performance.now()); timer.current = requestAnimationFrame(tick) }; timer.current = requestAnimationFrame(tick); return () => cancelAnimationFrame(timer.current) }, [meeting])
-  const elapsed = meeting ? now - startedAt : 0; const answerReadyAt = meeting?.answeredAt ? Math.max(meeting.answeredAt, startedAt + 3100) : null; const answerElapsed = answerReadyAt ? now - answerReadyAt : -1
-  const actors = Object.fromEntries(Object.entries(members).map(([id, member]) => [id, actorState(member, meeting, elapsed, answerElapsed, skill, selected, compareTargets)])); const selectedMember = members[selected] || Object.values(members)[0] || null
-  const activeId = meeting?.answeredAt && answerElapsed >= 0 && answerElapsed < 3700 ? meeting.primary : null; const activeMember = activeId ? members[activeId] : null
-  const citedDocs = reply?.citations?.map(citation => getDoc(citation.id)).filter(Boolean).filter((document, index, list) => list.findIndex(item => item.id === document.id) === index) || []
-  const activeDocs = activeMember ? retrieve(activeMember, meeting?.question) : []; const answerActive = Boolean(activeMember && reply?.sourceScope === 'personal' && reply.memberId === activeId)
-  const projectDocument = snapshot.documents.find(document => document.id === 'project-context'); const comparisonDocs = compareTargets.flatMap(id => retrieve(members[id])).slice(0, 8)
-  const ledgerDocs = useMemo(() => { if (reply && citedDocs.length) return citedDocs; if (ledgerScope === 'compare') return comparisonDocs; if (ledgerScope === 'project') return snapshot.documents.filter(document => document.scope === 'project'); if (ledgerScope === 'synthesis') return []; return activeDocs.length ? activeDocs : retrieve(selectedMember) }, [reply, activeId, selected, ledgerScope, compareTargets.join('|')])
-  const camera = activeMember ? actors[activeMember.id].point : boardOpen ? { x: 480, y: 226 } : selectedMember?.home || { x: 480, y: 340 }
-  const runSkill = key => { setSkill(key); setDockOpen(true); if (key === 'explore') { setLedgerScope('personal'); setLedgerOpen(true) } if (key === 'connect') { setBoardOpen(true); setQuestionScope('project') } if (key === 'verify') { setLedgerScope(reply?.sourceScope || 'personal'); setLedgerOpen(true) } if (key === 'compare') { setLedgerScope('compare'); setLedgerOpen(true) } if (key === 'convene') { setQuestionScope('personal'); setTimeout(() => document.getElementById('village-question')?.focus(), 0) } if (key === 'synthesis') { if (compareTargets.length >= 2) setDraftOpen(true); else { setLedgerScope('compare'); setLedgerOpen(true) } } }
-  const ask = async event => { event?.preventDefault(); const clean = question.trim(); if (!clean) return; const scope = questionScope; const id = requestId.current + 1; requestId.current = id; abort.current?.abort(); const controller = new AbortController(); abort.current = controller; const time = performance.now(); const nextMeeting = scope === 'personal' && selected ? planMeeting(clean, selected) : null; setMeeting(nextMeeting); setStartedAt(time); setNow(time); setReply(null); setLoading(true); setLedgerOpen(false); const timeout = window.setTimeout(() => controller.abort(), 30000); const finish = result => { if (!isCurrentRequest(id, requestId.current)) return; setReply(result); if (nextMeeting) setMeeting(current => current === nextMeeting ? { ...current, answeredAt: performance.now() } : current); else { setLedgerScope(scope); setLedgerOpen(true) } }; try { const response = await fetch('/api/wiki-chat', { method: 'POST', headers: { 'content-type': 'application/json' }, signal: controller.signal, body: JSON.stringify({ memberId: scope === 'personal' ? selected : undefined, scope, question: clean }) }); const result = await response.json(); finish(response.ok ? result : { mode: 'demo-fallback', sourceScope: scope, answer: '근거 기록을 불러오지 못했습니다.', citations: [], confidence: 'low', knowledgeType: 'wiki-record', limitation: '요청을 처리할 수 없습니다.' }) } catch { finish({ mode: 'demo-fallback', sourceScope: scope, answer: '근거 기록을 불러오지 못했습니다.', citations: [], confidence: 'low', knowledgeType: 'wiki-record', limitation: '서버 응답을 사용할 수 없습니다.' }) } finally { window.clearTimeout(timeout); if (isCurrentRequest(id, requestId.current)) setLoading(false) } }
-  const toggleCompare = id => setCompareTargets(current => current.includes(id) ? current.filter(value => value !== id) : current.length < 2 ? [...current, id] : [current[1], id])
-  const flow = snapshot.projectContext?.flow || []; const frame = Math.floor(now / 140) % 2
-  const skills = [{ id: 'explore', icon: '⌕', name: 'Wiki 탐색', description: '선택한 개인 기록을 Ledger에서 엽니다.' }, { id: 'connect', icon: '↗', name: '프로젝트 연결', description: 'Mission Board의 공통 맥락에 초점을 맞춥니다.' }, { id: 'verify', icon: '✓', name: '근거 검증', description: '발언 근거와 사실·의견 경계를 확인합니다.' }, { id: 'compare', icon: '⇄', name: '관점 비교', description: '대상을 직접 선택한 뒤에만 기록을 나란히 봅니다.' }, { id: 'convene', icon: '◌', name: '회의 소집', description: '질문 근거가 있는 아바타만 광장으로 부릅니다.' }, { id: 'synthesis', icon: '✎', name: '종합안 초안', description: '선택한 관점을 결정이 아닌 초안으로 엮습니다.', disabled: compareTargets.length < 2 }]
-  return <main className="knowledge-village"><header className="village-head"><div><p>KNOWLEDGE GUILD RPG</p><h1>기록이 모여 <i>방향</i>이 되는 마을</h1></div><aside><b>WIKI SNAPSHOT</b><span>{snapshot.generatedAt.slice(0, 10)} · {snapshot.members.length} avatars</span><span>{reply ? `${reply.mode === 'llm-grounded' ? 'LLM GROUNDED' : 'DEMO FALLBACK'} · ${reply.sourceScope}` : 'SCENARIO MOTION'}</span></aside></header><p className="boundary">아바타는 실제 구성원이 아니라 허용된 Wiki 기록 기반 표현입니다. 개인 기록, 프로젝트 공통 맥락, 종합 초안, 공식 결정은 서로 섞지 않습니다.</p><section className="world-shell" aria-label="Knowledge Guild RPG pixel world"><div className="world-camera" style={{ '--camera-x': `${190 - camera.x * .62}px`, '--camera-y': `${168 - camera.y * .62}px` }}><div className="world"><div className="grass" /><div className="river"><i /><i /><i /></div><div className="path north" /><div className="path west" /><div className="path east" /><div className="plaza"><b /><b /><b /><b /><span>KNOWLEDGE SQUARE</span></div><button className={`town-hall ${boardOpen ? 'focus' : ''}`} onClick={() => { setBoardOpen(open => !open); setQuestionScope('project') }} aria-expanded={boardOpen}><i className="hall-roof" /><i className="hall-wall" /><strong>MISSION BOARD</strong><small>프로젝트 공통 맥락</small></button><div className="library building"><i /><b>ARCHIVE</b></div><div className="atelier building"><i /><b>ATELIER</b></div><div className="signal building"><i /><b>LAB</b></div><div className="lamp lamp-one" /><div className="lamp lamp-two" /><div className="tree rear one" /><div className="tree rear two" />{Object.values(members).map(member => <Avatar key={member.id} member={member} actor={actors[member.id]} selected={selected === member.id} frame={frame} onSelect={id => { setSelected(id); setQuestionScope('personal'); setMeeting(null); setLedgerScope('personal'); setLedgerOpen(false); setGuildOpen(true) }} />)}<div className="tree front three" /><div className="tree front four" />{activeMember && answerActive && <Bubble member={activeMember} reply={reply} point={actors[activeMember.id].point} onOpenLedger={() => { setLedgerScope('personal'); setLedgerOpen(true) }} />}{boardOpen && <section className="mission-panel" aria-live="polite"><header><b>MISSION BOARD</b><button onClick={() => setBoardOpen(false)}>닫기 ×</button></header><p>프로젝트 공통 맥락 · {snapshot.projectContext?.source}</p><h2>{snapshot.projectContext?.title}</h2><strong>현재 목표</strong><span>{snapshot.projectContext?.goal || '기록된 목표가 없습니다.'}</span><strong>핵심 질문</strong><span>{snapshot.projectContext?.coreQuestion || '명시된 핵심 질문이 없습니다.'}</span><div className="flow">{flow.map((item, index) => <span key={item}>{item}{index < flow.length - 1 && <i>→</i>}</span>)}</div><strong>확장 방향</strong><span>{snapshot.projectContext?.expansion || '기록된 확장 방향이 없습니다.'}</span><em>현재 미확정 상태: {snapshot.projectContext?.status || '확인된 상태가 없습니다.'}</em><button onClick={() => { setQuestionScope('project'); document.getElementById('village-question')?.focus() }}>공통 맥락에 질문하기 ↗</button></section>}<div className="world-status">{loading ? 'RETRIEVING EVIDENCE' : meeting ? 'SCENARIO MOTION · selective attendance' : skill ? `SKILL · ${skills.find(item => item.id === skill)?.name}` : 'MISSION BOARD · SKILL DOCK'}</div></div></div></section>{guildOpen && <GuildCard member={selectedMember} onClose={() => setGuildOpen(false)} onAsk={() => { setQuestionScope('personal'); setGuildOpen(false); setDockOpen(true); setTimeout(() => document.getElementById('village-question')?.focus(), 0) }} />}<section className={`skill-dock ${dockOpen ? 'expanded' : ''}`} aria-label="Skill Dock"><header><div><p>SKILL DOCK</p><h2>기록에서 다음 행동으로</h2></div><button className="dock-toggle" type="button" aria-expanded={dockOpen} onClick={() => setDockOpen(open => !open)}>{dockOpen ? '접기 ×' : '질문·스킬 열기 ↗'}<small>{skill ? `활성: ${skills.find(item => item.id === skill)?.name}` : '근거로 다음 행동을 시작하세요'}</small></button></header><div className="skill-grid">{skills.map(item => <button key={item.id} className={skill === item.id ? 'active' : ''} disabled={item.disabled} onClick={() => runSkill(item.id)}><b>{item.icon}</b><strong>{item.name}</strong><small>{item.disabled ? '비교 대상 2명을 먼저 선택하세요.' : item.description}</small></button>)}</div><form className="question-row" onSubmit={ask}><label htmlFor="scope-select">근거 범위</label><select id="scope-select" value={questionScope} onChange={event => setQuestionScope(event.target.value)}><option value="personal">개인 Wiki · {selectedMember?.label || '선택 없음'}</option><option value="project">프로젝트 공통 맥락</option></select><label className="sr-only" htmlFor="village-question">질문</label><input id="village-question" value={question} onChange={event => setQuestion(event.target.value)} placeholder={questionScope === 'project' ? '프로젝트 공통 맥락에 질문하기' : `${selectedMember?.label || '멤버'} 기록에 질문하기`} /><button disabled={!question.trim() || loading} type="submit">{loading ? '확인 중…' : '근거로 질문 ↗'}</button></form></section><aside className={`ledger ${ledgerOpen ? 'open' : ''}`} aria-labelledby="ledger-title"><header><div><p>EVIDENCE LEDGER · {scopes[ledgerScope] || ledgerScope}</p><h2 id="ledger-title">기록의 경계</h2></div><button onClick={() => setLedgerOpen(false)}>닫기 ×</button></header><div className="ledger-tabs"><button onClick={() => { setLedgerScope('personal'); setLedgerOpen(true) }}>개인</button><button onClick={() => { setLedgerScope('project'); setLedgerOpen(true) }}>공통</button><button onClick={() => runSkill('compare')}>비교</button><button onClick={() => { setLedgerScope('decision'); setLedgerOpen(true) }}>결정</button></div>{ledgerScope === 'compare' && <section className="compare-picker"><b>비교 대상은 명시적으로 선택합니다</b><small>선택 전에는 다른 멤버의 기록을 사용하지 않습니다.</small>{memberList.map(member => <label key={member.id}><input type="checkbox" checked={compareTargets.includes(member.id)} onChange={() => toggleCompare(member.id)} /> {member.id}</label>)}<button disabled={compareTargets.length < 2} onClick={() => { setLedgerScope('compare'); setSkill('compare') }}>선택한 {compareTargets.length}명 기록 비교</button></section>}<div className="evidence-legend"><span>사실</span><span>개인 의견</span><span>가설</span><span>미검증</span></div><div className="ledger-list">{ledgerDocs.length ? ledgerDocs.map((document, index) => <article key={document.id} className={index === 0 && reply ? 'primary' : ''}><p>{scopes[document.scope] || document.category} · {document.author}</p><h3>{document.title}</h3><span>{document.updated} · {document.status}</span><small>{document.source}</small><q>{document.excerpt}</q></article>) : <article className="empty"><h3>{ledgerScope === 'decision' ? '기록된 공식 결정 없음' : '근거 기록을 찾지 못했습니다.'}</h3><small>{reply?.limitation || '현재 선택한 범위에 표시할 안전한 기록이 없습니다.'}</small></article>}</div>{reply && <footer><b>{reply.mode === 'llm-grounded' ? 'LLM GROUNDED' : 'DEMO FALLBACK'}</b><span>scope {reply.sourceScope} · confidence {reply.confidence}</span><small>{reply.limitation}</small></footer>}</aside>{draftOpen && <section className="draft-sheet" role="dialog" aria-modal="true" aria-labelledby="draft-title"><header><p>SYNTHESIS DRAFT · NOT A DECISION</p><button onClick={() => setDraftOpen(false)}>닫기 ×</button></header><h2 id="draft-title">선택한 관점의 종합 초안</h2><p>아래는 명시적으로 선택한 개인 Wiki 기록을 나란히 모은 초안입니다. 공식 결정이나 합의가 아닙니다.</p>{comparisonDocs.slice(0, 4).map(document => <article key={document.id}><b>{document.author}</b><h3>{document.title}</h3><small>{document.source}</small></article>)}</section>}<nav className="access-list" aria-label="접근성 아바타 목록">{memberList.map(member => <button key={member.id} onClick={() => { setSelected(member.id); setQuestionScope('personal') }}>{member.id}</button>)}<button onClick={() => { setBoardOpen(true); setQuestionScope('project') }}>Mission Board</button><button onClick={() => setLedgerOpen(true)}>Evidence Ledger</button></nav><p className="sr-status" aria-live="polite">{loading ? '허용된 근거를 확인 중입니다.' : reply ? `${scopes[reply.sourceScope]} 범위 답변을 표시합니다.` : `${selectedMember?.label || '멤버 없음'}을 선택했습니다.`}</p></main>
+  const [openMemberId, setOpenMemberId] = useState(null)
+  const openMember = snapshot.members.find(member => member.id === openMemberId) || null
+
+  return (
+    <main className="village-app">
+      <section className="village-map" aria-label="Knowledge Guild 마을">
+        <VillageScenery />
+        {snapshot.members.map((member, index) => (
+          <MemberHome key={member.id} member={member} index={index} onEnter={() => setOpenMemberId(member.id)} />
+        ))}
+        <div className="map-seal" aria-hidden="true"><b>KNOWLEDGE</b><span>GUILD</span></div>
+      </section>
+      {openMember && <HouseInterior key={openMember.id} member={openMember} onClose={() => setOpenMemberId(null)} />}
+      <p className="sr-only" aria-live="polite">{openMember ? `${openMember.displayName}의 Wiki 집 내부` : '길드 마을'}</p>
+    </main>
+  )
 }
 
 export default App

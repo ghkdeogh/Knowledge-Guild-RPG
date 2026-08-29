@@ -29,7 +29,7 @@ for (const document of snapshot.documents) {
 }
 const appSource = await readFile(join(repoRoot, 'apps/wiki-village/src/App.jsx'), 'utf8')
 for (const member of snapshot.members) if (new RegExp(`['\"]${member.id}['\"]`, 'i').test(appSource)) throw new Error('Member-specific identifier remains in App.jsx')
-for (const skill of ['Wiki 탐색', '프로젝트 연결', '근거 검증', '관점 비교', '회의 소집', '종합안 초안']) if (!appSource.includes(skill)) throw new Error(`Skill missing: ${skill}`)
-if (!appSource.includes("compareTargets.length < 2") || !appSource.includes("scope === 'personal' ? selected")) throw new Error('Explicit comparison opt-in or scoped question boundary is missing')
-for (const action of ["key === 'explore'", "key === 'connect'", "key === 'verify'", "key === 'compare'", "key === 'convene'", "key === 'synthesis'"]) if (!appSource.includes(action)) throw new Error(`Skill action is missing: ${action}`)
+if (!appSource.includes('snapshot.members.map') || !appSource.includes('MemberHome')) throw new Error('Member homes are not generated from the safe snapshot')
+if (!appSource.includes("document?.scope === 'personal'") || !appSource.includes('document.memberId === member.id')) throw new Error('House Wiki boundary is missing')
+if (!appSource.includes('HouseInterior') || !appSource.includes('filteredDocuments') || !appSource.includes('selectedDocument.source')) throw new Error('House Wiki browsing is incomplete')
 console.log(`Validated ${indexed.length} members and ${snapshot.documents.length} indexed documents.`)
