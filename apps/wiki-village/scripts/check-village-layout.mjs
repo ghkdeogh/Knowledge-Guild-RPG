@@ -11,7 +11,7 @@ if (!app.includes('MemberHome') || !app.includes('snapshot.members.map') || !app
 if (!app.includes('HouseInterior') || !app.includes('role="dialog"') || !app.includes('Wiki 문서 서가')) throw new Error('Wiki house interior is missing')
 if (!app.includes('MissionBoard') || !app.includes('AnswerPanel') || !app.includes('Source scope') || !app.includes('ALLOWLISTED SOURCE')) throw new Error('Traceable Mission Board answer surface is missing')
 if (!app.includes('Onboarding') || !app.includes("onboardingState.phase !== 'VILLAGE_READY'") || !app.includes('PROJECT_UNINITIALIZED')) throw new Error('Onboarding state gate is missing')
-if (!onboarding.includes('PROJECT WIKI ARCHITECT') || !onboarding.includes('편집 가능한 blueprint JSON') || onboarding.includes('PROJECT PROLOGUE')) throw new Error('Free-input architect review flow is missing or fixed interview remains')
+if (!onboarding.includes('PROJECT WIKI ARCHITECT') || !onboarding.includes('BlueprintFields') || !onboarding.includes('고급 JSON 편집기') || !onboarding.includes('identity-confirm') || onboarding.includes('PROJECT PROLOGUE')) throw new Error('Structured architect review flow is missing or fixed interview remains')
 if (!onboarding.includes('events.some') || !onboarding.includes('files.written')) throw new Error('Onboarding reward is not projected from application events')
 if (!app.includes("document.scope === scope") || !app.includes('documentsById.get(item.id)')) throw new Error('Client citation drawer does not re-check the safe snapshot scope')
 if (!css.includes('@media(max-width:800px)') || !css.includes('.room-content{display:block')) throw new Error('Responsive house interior guard is missing')

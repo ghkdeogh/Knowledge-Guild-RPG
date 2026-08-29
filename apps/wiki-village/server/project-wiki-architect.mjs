@@ -56,15 +56,26 @@ export function sanitizeBlueprint(value) {
     return { id, label: clean(candidate.label, 70) || id, route, reason: safeText(candidate.reason, 'page reason', 180) }
   }).slice(0, 8)
   if (!pageTypes.length) throw Object.assign(new Error('Blueprint needs page types'), { status: 400, code: 'invalid-blueprint' })
+  const assetTypes = (items, fallback) => {
+    const seen = new Set(); const values = (Array.isArray(items) ? items : fallback).map(item => {
+      const id = clean(item?.id || item, 32).toLowerCase()
+      if (!safePageId(id) || seen.has(id)) throw Object.assign(new Error('Unsafe source or output type'), { status: 400, code: 'unsafe-path' })
+      seen.add(id); return { id, label: clean(item?.label, 70) || id, reason: safeText(item?.reason || `승인된 ${id} 분류`, 'type reason', 180) }
+    }).slice(0, 6)
+    return values.length ? values : fallback
+  }
+  const sourceCategories = assetTypes(input.sourceCategories, [{ id: 'references', label: 'references', reason: '승인된 원본 출처를 분리하기 위해' }])
+  const outputTypes = assetTypes(input.outputTypes, [{ id: 'deliverables', label: 'deliverables', reason: '승인된 결과물을 compiled Wiki와 분리하기 위해' }])
   const harnesses = [...new Set((Array.isArray(input.harnesses) ? input.harnesses : []).map(item => clean(typeof item === 'string' ? item : item?.id, 24)).filter(id => harnessIds.has(id)))].slice(0, 4)
-  return { schema: blueprintSchema, brief, pageTypes, harnesses, rationale: clean(input.rationale, 360) || '승인된 목적과 결과에 맞춰 선택한 Wiki 구조입니다.' }
+  return { schema: blueprintSchema, brief, pageTypes, sourceCategories, outputTypes, harnesses, rationale: clean(input.rationale, 360) || '승인된 목적과 결과에 맞춰 선택한 Wiki 구조입니다.' }
 }
 
 function domainDefaults(text) {
-  if (contains(text, ['창작', '소설', '세계관', '캐릭터', 'plot', 'story', 'creative'])) return { pages: [page('world', '세계관의 공통 규칙을 분리하기 위해'), page('character', '등장인물과 관계를 기록하기 위해'), page('plot', '플롯과 장면의 선택을 추적하기 위해'), page('reference', '참고 자료와 출처를 분리하기 위해'), page('artifact', '공개할 산출물을 정리하기 위해')], harnesses: ['ingest', 'query', 'lint'] }
-  if (contains(text, ['시장', 'market', '고객', 'company', '기업', '경쟁'])) return { pages: [page('company', '대상 기업과 주체를 구분하기 위해'), page('market', '시장 변화와 조건을 추적하기 위해'), page('hypothesis', '검증 전 가정을 분리하기 위해'), page('signal', '관찰 신호를 기록하기 위해'), page('conclusion', '근거 기반 결론을 남기기 위해')], harnesses: ['ingest', 'query', 'lint'] }
-  if (contains(text, ['학습', 'learning', '교육', 'study', '기술', '개발', 'code'])) return { pages: [page('technical', '핵심 개념과 구현 사실을 정리하기 위해'), page('decision', '명시적 합의와 선택 근거를 분리하기 위해'), page('recipe', '반복 가능한 절차를 만들기 위해'), page('case', '적용 사례를 비교하기 위해')], harnesses: ['ingest', 'query', 'lint'] }
-  return { pages: [page('research', '조사 사실과 출처를 정리하기 위해'), page('hypothesis', '검증 전 가정을 분리하기 위해'), page('guide', '프로젝트 운영 방법을 남기기 위해'), page('log', '변화와 확인 기록을 남기기 위해')], harnesses: ['ingest', 'query', 'lint'] }
+  const types = (ids, label) => ids.map(id => ({ id, label: id, reason: `${label}을 분리해 안전하게 관리하기 위해` }))
+  if (contains(text, ['창작', '소설', '세계관', '캐릭터', 'plot', 'story', 'creative'])) return { pages: [page('world', '세계관의 공통 규칙을 분리하기 위해'), page('character', '등장인물과 관계를 기록하기 위해'), page('plot', '플롯과 장면의 선택을 추적하기 위해'), page('reference', '참고 자료와 출처를 분리하기 위해'), page('artifact', '공개할 산출물을 정리하기 위해')], sourceCategories: types(['inspiration', 'references'], '창작 참고 원본'), outputTypes: types(['story-bible', 'drafts'], '창작 결과물'), harnesses: ['ingest', 'query', 'lint'] }
+  if (contains(text, ['시장', 'market', '고객', 'company', '기업', '경쟁'])) return { pages: [page('company', '대상 기업과 주체를 구분하기 위해'), page('market', '시장 변화와 조건을 추적하기 위해'), page('hypothesis', '검증 전 가정을 분리하기 위해'), page('signal', '관찰 신호를 기록하기 위해'), page('conclusion', '근거 기반 결론을 남기기 위해')], sourceCategories: types(['interviews', 'market-signals'], '시장 조사 원본'), outputTypes: types(['briefs', 'findings'], '시장 조사 결과물'), harnesses: ['ingest', 'query', 'lint'] }
+  if (contains(text, ['학습', 'learning', '교육', 'study', '기술', '개발', 'code'])) return { pages: [page('technical', '핵심 개념과 구현 사실을 정리하기 위해'), page('decision', '명시적 합의와 선택 근거를 분리하기 위해'), page('recipe', '반복 가능한 절차를 만들기 위해'), page('case', '적용 사례를 비교하기 위해')], sourceCategories: types(['docs', 'experiments'], '학습 원본'), outputTypes: types(['learning-notes', 'recipes'], '학습 결과물'), harnesses: ['ingest', 'query', 'lint'] }
+  return { pages: [page('research', '조사 사실과 출처를 정리하기 위해'), page('hypothesis', '검증 전 가정을 분리하기 위해'), page('guide', '프로젝트 운영 방법을 남기기 위해'), page('log', '변화와 확인 기록을 남기기 위해')], sourceCategories: types(['references'], '조사 원본'), outputTypes: types(['deliverables'], '프로젝트 결과물'), harnesses: ['ingest', 'query', 'lint'] }
 }
 
 export function localDraft(statement, clarifications = []) {
@@ -77,24 +88,49 @@ export function localDraft(statement, clarifications = []) {
   const unknowns = [!purposeKnown && '프로젝트가 해결하려는 핵심 목적', !targetKnown && '이 Wiki를 사용할 주요 대상', !outcomeKnown && '성공으로 볼 수 있는 결과'].filter(Boolean)
   const projectName = contains(source, ['시장', 'market']) ? '시장 탐색 Wiki' : contains(source, ['학습', 'learning', '기술', '개발']) ? '학습 설계 Wiki' : '새 프로젝트 Wiki'
   const brief = validateBrief({ projectName, purpose: purposeKnown ? '승인 전 프로젝트 의도를 구조화하고, 확인 가능한 Wiki 기록으로 발전시키는 작업입니다.' : '프로젝트 의도를 구조화할 초안입니다.', target: targetKnown ? '사용자가 설명한 프로젝트의 참여자와 독자' : '승인 전 지정할 주요 독자', outcome: outcomeKnown ? '승인된 목적에 맞는 추적 가능한 Wiki와 결과 기록' : '성공 결과를 합의한 뒤 생성할 Wiki', knownFacts: ['사용자가 자유 형식의 프로젝트 설명을 제공했습니다.'], assumptions: ['아직 원문을 source layer에 ingest하지 않으며, 이 내용은 편집 가능한 해석 초안입니다.'], unknowns, mode: 'local-draft' })
-  const blueprint = sanitizeBlueprint({ brief, pageTypes: defaults.pages, harnesses: contains(source, ['회고', 'reflect', '성찰']) ? [...defaults.harnesses, 'reflect'] : defaults.harnesses, rationale: '도메인 신호에 따라 제안한 초기 구조이며, 승인 전에 자유롭게 수정할 수 있습니다.' })
+  const blueprint = sanitizeBlueprint({ brief, pageTypes: defaults.pages, sourceCategories: defaults.sourceCategories, outputTypes: defaults.outputTypes, harnesses: contains(source, ['회고', 'reflect', '성찰']) ? [...defaults.harnesses, 'reflect'] : defaults.harnesses, rationale: '도메인 신호에 따라 제안한 초기 구조이며, 승인 전에 자유롭게 수정할 수 있습니다.' })
   return { mode: 'local-draft', brief, blueprint, nextQuestion: unknowns[0] || null }
 }
 
-const analysisSchema = { type: 'object', additionalProperties: false, required: ['brief', 'pageTypes', 'harnesses', 'rationale'], properties: { brief: { type: 'object' }, pageTypes: { type: 'array' }, harnesses: { type: 'array' }, rationale: { type: 'string' } } }
+const analysisSchema = {
+  type: 'object', additionalProperties: false, required: ['brief', 'pageTypes', 'sourceCategories', 'outputTypes', 'harnesses', 'rationale'], properties: {
+    brief: { type: 'object', additionalProperties: false, required: ['projectName', 'purpose', 'target', 'outcome', 'knownFacts', 'assumptions', 'unknowns'], properties: {
+      projectName: { type: 'string' }, purpose: { type: 'string' }, target: { type: 'string' }, outcome: { type: 'string' },
+      knownFacts: { type: 'array', items: { type: 'string' } }, assumptions: { type: 'array', items: { type: 'string' } }, unknowns: { type: 'array', items: { type: 'string' } },
+    } },
+    pageTypes: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['id', 'label', 'reason'], properties: { id: { type: 'string' }, label: { type: 'string' }, reason: { type: 'string' } } } },
+    sourceCategories: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['id', 'label', 'reason'], properties: { id: { type: 'string' }, label: { type: 'string' }, reason: { type: 'string' } } } },
+    outputTypes: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['id', 'label', 'reason'], properties: { id: { type: 'string' }, label: { type: 'string' }, reason: { type: 'string' } } } },
+    harnesses: { type: 'array', items: { type: 'string' } }, rationale: { type: 'string' },
+  },
+}
+const diagnostic = (category, message) => ({ category, message })
+const providerFailure = error => {
+  if (error instanceof SyntaxError || error?.code === 'invalid-input' || error?.code === 'invalid-blueprint' || error?.code === 'unsafe-path') return diagnostic('malformed-response', 'AI 응답 형식을 검증하지 못해 로컬 초안을 제안합니다.')
+  if (error?.name === 'AbortError' || /network|fetch|timeout|etimedout|econn|enotfound/i.test(String(error?.code || error?.message || ''))) return diagnostic('unavailable', 'AI 제공자에 연결할 수 없어 로컬 초안을 제안합니다.')
+  return diagnostic('failed', 'AI 제안을 사용할 수 없어 로컬 초안을 제안합니다.')
+}
 export async function analyzeProject({ statement, clarifications = [] }, { responsesClient, providerConfig = {} } = {}) {
   const fallback = localDraft(statement, clarifications)
-  if (!providerConfig.apiKey && !responsesClient) return fallback
+  if (!providerConfig.apiKey && !responsesClient) return { ...fallback, providerStatus: 'not-configured', diagnostic: diagnostic('not-configured', 'AI 제공자가 설정되지 않아 로컬 초안을 제안합니다.') }
   try {
     const OpenAI = (await import('openai')).default
     const client = responsesClient || new OpenAI({ apiKey: providerConfig.apiKey })
-    const response = await client.responses.create({ model: providerConfig.model || 'gpt-5.6-terra', store: false, instructions: 'Interpret a project statement without repeating it. Return only a Korean JSON proposal. Distinguish known facts, assumptions, and unknowns. Propose project-specific page type ids as lowercase hyphenated identifiers matching ^[a-z][a-z0-9-]{1,32}$; do not use raw, output, private, secrets, .env, node_modules, .obsidian, or reserved Windows names. Routes must be wiki/<page-type>/index.md. Never provide source content or arbitrary paths.', input: 'Create an editable project Wiki blueprint from this user statement and optional clarification answers. Do not quote or reproduce either.\nStatement: ' + clean(statement, 1200) + '\nClarifications: ' + clarifications.map(item => clean(item, 500)).filter(Boolean).join(' | '), text: { format: { type: 'json_schema', name: 'project_wiki_architect', strict: true, schema: analysisSchema } } })
-    const parsed = JSON.parse(response.output_text)
+    const response = await client.responses.create({ model: providerConfig.model || 'gpt-5.6-terra', store: false, ...(providerConfig.reasoningEffort ? { reasoning: { effort: providerConfig.reasoningEffort } } : {}), instructions: 'Interpret a project statement without repeating it. Return only a Korean JSON proposal. Distinguish known facts, assumptions, and unknowns. Propose project-specific page type ids as lowercase hyphenated identifiers matching ^[a-z][a-z0-9-]{1,32}$; do not use raw, output, private, secrets, .env, node_modules, .obsidian, or reserved Windows names. Routes are server-rendered, so do not return paths. Never provide source content or arbitrary paths.', input: 'Create an editable project Wiki blueprint from this user statement and optional clarification answers. Do not quote or reproduce either.\nStatement: ' + clean(statement, 1200) + '\nClarifications: ' + clarifications.map(item => clean(item, 500)).filter(Boolean).join(' | '), text: { format: { type: 'json_schema', name: 'project_wiki_architect', strict: true, schema: analysisSchema } } }, typeof AbortSignal?.timeout === 'function' ? { signal: AbortSignal.timeout(30000) } : undefined)
+    const outputText = typeof response.output_text === 'string' ? response.output_text : response.output?.flatMap(item => item.content || []).map(item => item.text || item.value || '').find(Boolean)
+    if (response.status && response.status !== 'completed') throw Object.assign(new Error('Provider response incomplete'), { code: 'provider-incomplete' })
+    const parsed = JSON.parse(outputText)
     const blueprint = sanitizeBlueprint({ ...parsed, brief: { ...parsed.brief, mode: 'llm-suggestion' } })
-    const protectedUtterances = [statement, ...clarifications].map(item => clean(item, 1200)).filter(item => item.length >= 16)
+    const protectedUtterances = [statement, ...clarifications].flatMap(item => clean(item, 1200).split(/[.!?。]|\s{2,}/)).map(item => item.trim()).filter(item => item.length >= 16)
     if (protectedUtterances.some(item => JSON.stringify(blueprint).includes(item))) throw new Error('LLM proposal copied user utterance')
-    return { mode: 'llm-suggestion', brief: blueprint.brief, blueprint, nextQuestion: blueprint.brief.unknowns[0] || null }
-  } catch { return fallback }
+    return { mode: 'llm-suggestion', providerStatus: 'available', diagnostic: null, brief: blueprint.brief, blueprint, nextQuestion: blueprint.brief.unknowns[0] || null }
+  } catch (error) { return { ...fallback, providerStatus: providerFailure(error).category, diagnostic: providerFailure(error) } }
+}
+
+function renderHarness(role, safe) {
+  const routes = safe.pageTypes.map(item => `- wiki/${item.id}/index.md — ${item.label}`).join('\n')
+  const roleWorkflow = { ingest: '승인된 동일 scope 원본의 메타데이터만 읽고 compiled page 초안을 제안합니다.', query: '선택한 project 또는 하나의 member scope의 compiled Wiki만 읽고 인용 가능한 route를 반환합니다.', lint: 'allowlist route와 frontmatter·index/log 일치만 검사하고 콘텐츠를 쓰지 않습니다.', reflect: '개인 Wiki의 선택적 성찰 초안만 제안하며 공통 사실이나 공식 결정으로 승격하지 않습니다.' }[role]
+  return ['---', `name: ${role}`, `schema: ${architectSchema}`, 'knowledgeType: wiki-harness', '---', '', `# ${role} Wiki Harness`, '', '## Purpose and trigger', '', `승인된 blueprint의 ${role} 역할입니다. ${roleWorkflow}`, '', '## Allowed scope', '', '- 읽기: project는 projects/wiki/와 projects/WIKI_INDEX.md, ACTIVITY_LOG.md만, personal은 요청한 하나의 members/{member-id}/wiki/와 같은 member의 index/log만 허용합니다.', '- 쓰기: 명시적 승인 뒤 allowlist compiled route와 같은 scope의 WIKI_INDEX.md, ACTIVITY_LOG.md 계획만 허용합니다.', '- raw/는 ingest 승인 원본의 위치일 뿐 자동 읽기·복사 대상이 아니며 output/은 compiled Wiki와 분리합니다.', '', '## Workflow', '', '1. 요청 scope, member-id, knowledge type, approval 여부를 검증합니다.', '2. 아래 routing rule에서 가장 좁은 page type을 고르고 근거·한계를 기록합니다.', '3. index/log 변경과 output 제안을 포함한 계획을 사람이 검토합니다.', '4. 승인 뒤에만 허용된 compiled route를 갱신하고 결과를 검증합니다.', '', '## Routing rules', '', routes, '', '## Approval and knowledge boundary', '', '- canonical overwrite, raw ingest, 다른 member 접근, 공식 결정 승격은 별도 명시적 승인이 필요합니다.', '- 개인 의견은 member Wiki에만 남기며 projects/ 공통 사실 또는 decisions/ 공식 결정으로 바꾸지 않습니다.', '', '## Index and log contract', '', '새 기록에는 page type·source scope·knowledge type을 표시하고 같은 scope의 WIKI_INDEX.md와 ACTIVITY_LOG.md에 route와 변경 이유를 함께 계획합니다.', '', '## Output contract', '', '결과는 route, 짧은 구조화 요약, 근거/한계, 필요한 승인으로 구성합니다. 원문·비밀값·허용 밖 member 기록은 출력하지 않습니다.', '', '## Reject rules', '', '.., 절대 경로, .env, private, secrets, node_modules, raw 원문 복사, 무승인 overwrite, 권한 없는 member scope는 거부합니다.', '', '## Example and verification', '', `예: wiki/${safe.pageTypes[0].id}/index.md에 기록을 제안할 때 page type과 scope를 확인하고 index/log 갱신 계획을 함께 제시합니다. 검증은 route allowlist, approval 상태, frontmatter knowledge type, index/log 계획의 일치를 확인합니다.`, ''].join('\n')
 }
 
 export function renderProjectFiles(blueprint) {
@@ -104,15 +140,17 @@ export function renderProjectFiles(blueprint) {
   const list = items => items.length ? items.map(item => `- ${item}`).join('\n') : '- 없음'
   const files = {
     'PROJECT_CONTEXT.md': `---\n${front}---\n\n# Project Context\n\n## Purpose\n\n${brief.purpose}\n\n## Target\n\n${brief.target}\n\n## Outcome\n\n${brief.outcome}\n\n## Known facts\n\n${list(brief.knownFacts)}\n\n## Assumptions\n\n${list(brief.assumptions)}\n\n## Unknowns\n\n${list(brief.unknowns)}\n`,
-    'WIKI_BLUEPRINT.md': `---\nschema: ${blueprintSchema}\nknowledgeType: wiki-record\n---\n\n# Wiki Blueprint\n\n## Rationale\n\n${safe.rationale}\n\n## Page types\n\n${safe.pageTypes.map(item => `- ${item.id}: ${item.reason}`).join('\n')}\n\n## Harnesses\n\n${safe.harnesses.length ? safe.harnesses.map(item => `- ${item}`).join('\n') : '- 없음'}\n\n## Blueprint JSON\n\n\`\`\`json\n${JSON.stringify(safe, null, 2)}\n\`\`\`\n`,
+    'WIKI_BLUEPRINT.md': `---\nschema: ${blueprintSchema}\nknowledgeType: wiki-record\n---\n\n# Wiki Blueprint\n\n## Rationale\n\n${safe.rationale}\n\n## Page types\n\n${safe.pageTypes.map(item => `- ${item.id}: ${item.reason}`).join('\n')}\n\n## Source categories\n\n${safe.sourceCategories.map(item => `- raw/${item.id}: ${item.reason}`).join('\n')}\n\n## Output types\n\n${safe.outputTypes.map(item => `- output/${item.id}: ${item.reason}`).join('\n')}\n\n## Harnesses\n\n${safe.harnesses.length ? safe.harnesses.map(item => `- ${item}`).join('\n') : '- 없음'}\n\n## Blueprint JSON\n\n\`\`\`json\n${JSON.stringify(safe, null, 2)}\n\`\`\`\n`,
     'raw/README.md': '# Raw source layer\n\n원문 source는 명시적 ingest 승인 뒤에만 추가합니다. 이 scaffold에는 사용자 원문이 저장되지 않습니다.\n',
     'wiki/index.md': `---\nschema: ${blueprintSchema}\nknowledgeType: wiki-record\n---\n\n# ${brief.projectName} Wiki\n\n승인된 blueprint의 compiled Wiki index입니다.\n`,
     'output/README.md': '# Output layer\n\n결과물은 compiled Wiki와 분리해 둡니다. snapshot에는 포함되지 않습니다.\n',
     'WIKI_INDEX.md': '# Wiki index\n\n' + safe.pageTypes.map(item => `- [${item.label}](${item.route})`).join('\n') + '\n',
     'ACTIVITY_LOG.md': '# Activity log\n\n- Scaffold created after explicit approval.\n',
   }
+  for (const item of safe.sourceCategories) files[`raw/${item.id}/README.md`] = `# ${item.label} source category\n\n${item.reason}\n\n원본은 명시적 ingest 승인 뒤에만 local-first으로 둡니다.\n`
+  for (const item of safe.outputTypes) files[`output/${item.id}/README.md`] = `# ${item.label} output type\n\n${item.reason}\n\n결과물은 compiled Wiki와 분리하며 snapshot에 포함하지 않습니다.\n`
   for (const item of safe.pageTypes) files[item.route] = `---\nschema: ${blueprintSchema}\nknowledgeType: ${item.id === 'hypothesis' ? 'hypothesis' : 'wiki-record'}\npageType: ${item.id}\n---\n\n# ${item.label}\n\n## Purpose\n\n${item.reason}\n\n## Records\n\n승인 뒤에 확인 가능한 Wiki 기록을 추가합니다.${item.id === 'decision' ? '\n\n이 페이지는 공식 결정이 아닙니다. 합의된 결정은 decisions/에 별도로 기록합니다.' : ''}\n`
-  for (const harness of safe.harnesses) files[`wiki/harnesses/${harness}.md`] = `# ${harness} harness\n\n이 역할은 승인된 blueprint에 따라 선택되었습니다.\n`
+  for (const harness of safe.harnesses) files[`harnesses/${harness}.SKILL.md`] = renderHarness(harness, safe)
   return files
 }
 
@@ -128,8 +166,10 @@ export function renderMemberFiles(identity, blueprint) {
     'WIKI_INDEX.md': '# Personal Wiki index\n\n' + safe.pageTypes.map(item => `- ${item.label}`).join('\n') + '\n',
     'ACTIVITY_LOG.md': '# Activity log\n\n- Personal Wiki scaffold created after explicit approval.\n',
   }
+  for (const item of safe.sourceCategories) files[`raw/${item.id}/README.md`] = `# ${item.label} source category\n\n${item.reason}\n\n원문은 명시적 ingest 승인 뒤에만 이 member scope에 둡니다.\n`
+  for (const item of safe.outputTypes) files[`output/${item.id}/README.md`] = `# ${item.label} output type\n\n${item.reason}\n\n결과물은 member compiled Wiki와 분리합니다.\n`
   for (const item of safe.pageTypes) files[`wiki/${item.id}/index.md`] = `---\nschema: ${blueprintSchema}\nmemberId: ${safeIdentity.memberId}\nknowledgeType: ${item.id === 'hypothesis' ? 'hypothesis' : 'wiki-record'}\npageType: ${item.id}\n---\n\n# ${item.label}\n\n## Approved working context\n\n${safeIdentity.workingContext}\n`
-  for (const harness of safe.harnesses) files[`wiki/harnesses/${harness}.md`] = `# ${harness} harness\n\n이 역할은 승인된 blueprint에 따라 선택되었습니다.\n`
+  for (const harness of safe.harnesses) files[`harnesses/${harness}.SKILL.md`] = renderHarness(harness, safe)
   return files
 }
 

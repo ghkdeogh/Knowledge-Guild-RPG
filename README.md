@@ -62,9 +62,9 @@ npm ci
 npm run dev -- --host 0.0.0.0
 ```
 
-터미널에 나온 `http://localhost:5173`은 **내 컴퓨터에서만** 여는 주소입니다. 같은 Wi-Fi의 다른 기기에서 보려면 `http://내-LAN-IP:5173`을 사용합니다. 다만 현재 local onboarding API는 loopback 요청만 허용하므로 LAN 주소에서는 화면을 볼 수 있어도 분석·저장 요청은 차단됩니다. 파일을 실제로 만들려면 로컬 컴퓨터의 `localhost` 또는 CLI를 사용하세요.
+터미널에 나온 `http://localhost:5173`은 **내 컴퓨터에서만** 여는 주소입니다. 같은 Wi-Fi의 다른 기기에서 보려면 `http://내-LAN-IP:5173`을 사용합니다. LAN에서는 분석과 파일 계획 미리보기까지만 가능하고, 실제 저장은 이 컴퓨터의 `localhost` 또는 CLI에서만 허용됩니다. 화면은 처음부터 이 제한을 표시합니다.
 
-AI provider는 선택 사항입니다. 사용하려면 `apps/wiki-village/.env.example`을 참고해 같은 폴더에 `.env`를 만들고 서버 전용 키를 넣습니다. `.env`와 API 키는 커밋하지 말고 `VITE_` 접두사에도 넣지 마세요. 키가 없거나 호출이 실패하면 UI는 **local draft**임을 명확히 표시합니다.
+AI provider는 선택 사항입니다. 사용하려면 `apps/wiki-village/.env.example`을 참고해 같은 폴더에 `.env`를 만들고 서버 전용 키를 넣습니다. `.env`와 API 키는 커밋하지 말고 `VITE_` 접두사에도 넣지 마세요. Architect는 항상 `mode`, `providerStatus`, 안전한 diagnostic을 표시합니다. 키 없음(`not-configured`), 응답 형식 오류(`malformed-response`), 네트워크 오류(`unavailable`), 기타 provider 실패(`failed`)는 **local draft**로 분명히 구분됩니다. 비용이 드는 연결 점검은 `KNOWLEDGE_GUILD_PROVIDER_SMOKE=1`과 키를 함께 설정한 뒤에만 `npm run test:provider-smoke`로 실행합니다.
 
 ## 첫 Wiki 만들기
 
@@ -157,7 +157,7 @@ members/<member-id>/
   wiki/                    # AI가 컴파일해 유지할 Wiki 계층
   output/                  # Wiki에서 만든 별도 결과물
   index/ · log/            # 멤버 범위 색인과 기록
-  harness/                 # 선택된 ingest/query/lint/reflect scaffold
+  harnesses/               # 선택된 ingest/query/lint/reflect SKILL.md scaffold
 ```
 
 예를 들어 기술 학습은 `기술 / 판단 / 레시피 / 사례`, 시장 조사는 `기업 / 시장 / 가설 / 신호 / 결론`, 창작은 `세계관 / 캐릭터 / 플롯 / 자료 / 산출물`처럼 달라질 수 있습니다. 이는 예시일 뿐이며, 실제 page type은 프로젝트 입력과 승인한 blueprint가 결정합니다.
@@ -184,6 +184,7 @@ members/<member-id>/
 npm run test:snapshot
 npm run test:chat
 npm run test:onboarding
+npm run test:provider-smoke # key + explicit opt-in 없으면 SKIP
 npm run test:deploy
 npm run test:layout
 npm run test:guild
@@ -195,7 +196,7 @@ snapshot·chat·onboarding 검사는 scope, citation, local draft, 입력 검증
 ## 현재 한계와 다음 작업
 
 - 실제 provider key를 넣은 end-to-end round trip은 아직 검증하지 않았습니다.
-- LAN URL에서 onboarding API는 현재 loopback 제한 때문에 분석 단계까지 실행되지 않는 알려진 제약이 있습니다.
+- LAN URL에서는 의도적으로 분석·미리보기만 지원하며, 저장은 localhost/CLI로 제한합니다.
 - `ingest / query / lint / reflect`는 blueprint가 선택할 수 있는 scaffold/hook이며, 아직 실행 엔진은 아닙니다.
 - CLI 이벤트는 현재 동기 응답 JSONL입니다. 실시간 session stream과 replay는 후속 작업입니다.
 - 픽셀 캐릭터를 눌러 대화하는 기능과 guild news의 Git 변경 확인 UI는 후속 작업입니다.

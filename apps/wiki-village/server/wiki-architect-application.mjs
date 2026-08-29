@@ -11,7 +11,7 @@ export async function runWikiArchitect(command, payload = {}, options = {}) {
       const clarifications = Array.isArray(payload.clarifications) ? payload.clarifications.slice(0, 2) : []
       const analyzed = await analyzeProject({ statement: payload.statement, clarifications }, { providerConfig: options.providerConfig, responsesClient: options.responsesClient })
       const result = clarifications.length >= 2 ? { ...analyzed, nextQuestion: null } : analyzed
-      events.push(event('answer.received', { mode: result.mode }), event('blueprint.proposed', { blueprint: result.blueprint }))
+      events.push(event('answer.received', { mode: result.mode, providerStatus: result.providerStatus, diagnostic: result.diagnostic }), event('blueprint.proposed', { blueprint: result.blueprint }))
       if (result.nextQuestion) events.push(event('question.asked', { question: result.nextQuestion, count: clarifications.length + 1 }))
       events.push(event('approval.required', { reason: '승인 전에는 source 또는 compiled Wiki 파일을 만들지 않습니다.' }), event('session.completed', { phase: 'review' }))
       return { events, result }
