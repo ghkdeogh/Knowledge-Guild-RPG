@@ -32,3 +32,24 @@ export function activityBand(lastPublicActivity, now = new Date()) {
 }
 
 export const activityDescription = activity => activity?.lastPublicActivity ? `최근 공개 저장소 활동 ${activity.lastPublicActivity} · ${activity.label}` : '최근 공개 저장소 활동 날짜를 확인하지 못함 · 중립 대기'
+
+export function repositoryPathState(memberId, repository, seenNews = {}) {
+  const state = repository?.members?.[memberId]
+  if (!state) return { id: 'unknown', pose: 'neutral', message: null, remoteTip: null }
+  if (state.remoteNews && state.remoteTip && seenNews[memberId] !== state.remoteTip) return { id: 'remote-news', pose: 'notice', message: '새 공개 Wiki 기록이 도착했어요.', remoteTip: state.remoteTip }
+  if (state.dirty) return { id: 'local-dirty', pose: 'crafting', message: '공개 Wiki 경로에 작성 중 변경이 있어요.', remoteTip: null }
+  return { id: 'known', pose: null, message: null, remoteTip: state.remoteTip || null }
+}
+
+export function selectRepositoryBark(members = [], repository, seenNews = {}, dismissed = {}) {
+  const candidates = members.map(member => ({ member, state: repositoryPathState(member.id, repository, seenNews) }))
+    .filter(item => item.state.id === 'remote-news' || item.state.id === 'local-dirty')
+    .sort((left, right) => (left.state.id === 'remote-news' ? 0 : 1) - (right.state.id === 'remote-news' ? 0 : 1) || left.member.id.localeCompare(right.member.id))
+  const choice = candidates.find(item => !dismissed[`${item.member.id}:${item.state.id}:${item.state.remoteTip || 'dirty'}`])
+  return choice ? { ...choice, key: `${choice.member.id}:${choice.state.id}:${choice.state.remoteTip || 'dirty'}` } : null
+}
+
+export function confirmMemberSeen(seenNews = {}, memberId, repository) {
+  const state = repository?.members?.[memberId]
+  return state?.remoteNews && state.remoteTip ? { ...seenNews, [memberId]: state.remoteTip } : seenNews
+}

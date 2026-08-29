@@ -3,6 +3,7 @@ import snapshot from './data/wiki-snapshot.json'
 import { isCurrentRequest } from './chat-request.js'
 import Onboarding from './Onboarding.jsx'
 import { memberHomePosition } from './village-layout.js'
+import { confirmMemberSeen, repositoryPathState, selectRepositoryBark } from './guild.js'
 
 const palette = ['sage', 'berry', 'ochre', 'lake', 'clay', 'plum', 'pine', 'sun']
 
@@ -27,7 +28,12 @@ function PixelAvatar({ member, tone, onEnter, onSelect, pose = 'neutral' }) {
   )
 }
 
-function MemberHome({ member, index, onEnter, onSelect, pose }) {
+function RepositoryBark({ bark, onOpen, onDismiss }) {
+  if (!bark) return null
+  return <aside className="repository-bark" aria-label="공개 Wiki 경로 상태"><button onClick={onOpen}>{bark.state.message}<small>공개 Wiki 경로 상태 보기</small></button><button className="bark-dismiss" onClick={onDismiss} aria-label="이 경로 상태 말풍선 닫기">×</button></aside>
+}
+
+function MemberHome({ member, index, onEnter, onSelect, pose, bark, onBarkOpen, onBarkDismiss }) {
   const spot = memberHomePosition(index)
   const position = { left: `${spot.left}%`, top: `${spot.top}%` }
   const tone = palette[index % palette.length]
@@ -41,6 +47,7 @@ function MemberHome({ member, index, onEnter, onSelect, pose }) {
         <span className="house-sign"><b>{member.displayName}</b><small>{count} WIKI</small></span>
       </button>
       <PixelAvatar member={member} tone={tone} onEnter={onEnter} onSelect={onSelect} pose={pose} />
+      <RepositoryBark bark={bark} onOpen={onBarkOpen} onDismiss={onBarkDismiss} />
     </section>
   )
 }
@@ -125,8 +132,9 @@ const modeCopy = {
   error: '오류 · 답변 없음',
 }
 
-function MissionBoard({ onAskProject, onRepositoryCheck, onSkills, repository }) {
+function MissionBoard({ onAskProject, onRepositoryCheck, onSkills, onChanges, repository }) {
   const context = snapshot.projectContext
+  const projectChanges = (repository?.project?.dirty || 0) + (repository?.project?.remoteNews || 0)
   return (
     <aside className="mission-board" aria-label="Mission Board">
       <small>MISSION BOARD</small>
@@ -134,7 +142,8 @@ function MissionBoard({ onAskProject, onRepositoryCheck, onSkills, repository })
       <p>{context.goal || '프로젝트 공통 맥락을 확인합니다.'}</p>
       <dl><div><dt>범위</dt><dd>project · projects/</dd></div><div><dt>출처</dt><dd>{context.source}</dd></div></dl>
       <button onClick={onAskProject}>프로젝트 기록에 질문</button><button onClick={onSkills}>길드홀 스킬 보기</button><button className="repository-bell" onClick={onRepositoryCheck}>저장소 새 소식 확인</button>
-      {repository && <p className="repository-note" role="status">{repository.message} · {repository.branch || repository.mode} · project 변경 {(repository.project?.dirty || 0) + (repository.project?.remoteNews || 0)}</p>}
+      {repository && <p className="repository-note" role="status">{repository.message} · {repository.branch || repository.mode} · 공통 공개 Wiki 경로 변경 {projectChanges}</p>}
+      {projectChanges > 0 && <button className="project-change-action" onClick={onChanges}>공통 변화 보기 · {projectChanges}</button>}
     </aside>
   )
 }
@@ -239,18 +248,23 @@ function VillageScenery() {
   )
 }
 
-const poseFor = (member, repository, seen) => {
-  const state = repository?.members?.[member.id]
-  if (state?.dirty) return 'crafting'
-  if (state?.remoteNews && state.remoteTip && seen?.[member.id] !== state.remoteTip) return 'notice'
-  return member.activity?.pose || 'neutral'
-}
+const poseFor = (member, repository, seen) => repositoryPathState(member.id, repository, seen).pose || member.activity?.pose || 'neutral'
 function CharacterMenu({ member, onAsk, onHome, onSkills, onChanges, onClose }) {
   useEffect(() => { const close = event => event.key === 'Escape' && onClose(); window.addEventListener('keydown', close); return () => window.removeEventListener('keydown', close) }, [onClose])
   return <aside className="character-menu" role="dialog" aria-label={`${member.displayName}의 공개 Wiki 경로 행동`}><b>{member.displayName} · 공개 Wiki 경로 상태</b><code>members/{member.id}/wiki/</code><button onClick={onAsk}>질문하기</button><button onClick={onHome}>Wiki 집 열기</button><button onClick={onSkills}>배치 스킬 보기</button><button onClick={onChanges}>저장소 변화 보기</button></aside>
 }
 function SkillStation({ skills, detail, onDetail, onClose }) {
   return <aside className="skill-station" role="dialog" aria-modal="true" aria-label="배치된 Wiki 스킬"><button className="exit-button" onClick={onClose}>닫기</button><small>SKILL STATION</small><h2>배치된 harness</h2>{!skills.length && <p>아직 배치된 스킬이 없습니다. Wiki scaffold를 승인하면 이곳에 안전한 metadata만 놓입니다.</p>}{skills.map(skill => <button key={`${skill.scope}-${skill.memberId || 'project'}-${skill.id}`} className="skill-prop" onClick={() => onDetail(skill)}>{skill.scope === 'project' ? '길드홀' : skill.memberId} · {skill.id}</button>)}{detail && <article className="skill-detail"><h3>{detail.id}</h3><p>{detail.purpose}</p><code>{detail.allowedScope}</code><p>{detail.readiness}</p></article>}</aside>
+}
+function RepositoryChanges({ repository, scope, member, seenNews, onConfirm, onClose }) {
+  useEffect(() => { const close = event => event.key === 'Escape' && onClose(); window.addEventListener('keydown', close); return () => window.removeEventListener('keydown', close) }, [onClose])
+  const memberId = member?.id || null
+  const scopeLabel = scope === 'member' ? member ? `${member.displayName} · members/${member.id}/` : '선택된 member 공개 Wiki 경로' : '프로젝트 공통 · projects/'
+  const includesScope = item => scope === 'member' ? item.scope === 'member' && item.memberId === memberId : item.scope === 'project'
+  const dirty = (repository?.dirty || []).filter(includesScope); const remote = (repository?.remoteNews || []).filter(includesScope)
+  const state = scope === 'member' && memberId ? repository?.members?.[memberId] : null
+  const unseen = state?.remoteNews && state.remoteTip && seenNews[memberId] !== state.remoteTip
+  return <aside className="repository-changes" role="dialog" aria-modal="true" aria-label={`${scopeLabel} 공개 Wiki 경로 변화`}><header><div><small>REPOSITORY CHANGES</small><h2>{scopeLabel}</h2><p>원문 diff 없이 허용된 공개 Wiki 경로 metadata만 표시합니다.</p></div><button className="exit-button" onClick={onClose} autoFocus>닫기</button></header><dl><div><dt>branch</dt><dd>{repository?.branch || repository?.mode || '확인 전'}</dd></div><div><dt>ahead / behind</dt><dd>{repository?.ahead || 0} / {repository?.behind || 0}{repository?.diverged ? ' · diverged' : ''}</dd></div><div><dt>fetch</dt><dd>{repository?.fetch?.outcome || 'not-requested'}</dd></div></dl><section><h3>로컬 작성 중</h3>{dirty.length ? <ul>{dirty.map(item => <li key={item.path}><code>{item.path}</code></li>)}</ul> : <p>표시할 로컬 공개 경로 변경이 없습니다.</p>}</section><section><h3>원격 새 기록</h3>{remote.length ? <ul>{remote.map(item => <li key={item.path}><code>{item.path}</code></li>)}</ul> : <p>표시할 원격 공개 경로 변경이 없습니다.</p>}</section>{unseen && <button className="confirm-news" onClick={onConfirm}>새 기록 확인</button>}</aside>
 }
 
 function App() {
@@ -259,12 +273,15 @@ function App() {
   const [selectedMemberId, setSelectedMemberId] = useState(null)
   const [repository, setRepository] = useState(null)
   const [seenNews, setSeenNews] = useState(() => { try { const value = JSON.parse(localStorage.getItem('knowledge-guild-seen-news') || '{}'); return value && typeof value === 'object' && !Array.isArray(value) ? value : {} } catch { return {} } })
+  const [dismissedBarks, setDismissedBarks] = useState({})
+  const [changesScope, setChangesScope] = useState(null)
   const [showSkills, setShowSkills] = useState(false); const [skillDetail, setSkillDetail] = useState(null); const [skillScope, setSkillScope] = useState({ scope: 'project', memberId: null })
   const [onboardingState, setOnboardingState] = useState(() => ({ persistenceMode: 'local-writable', phase: snapshot.projectState === 'VILLAGE_READY' ? 'VILLAGE_READY' : snapshot.projectState === 'PROJECT_READY' ? 'MEMBER_ONBOARDING' : 'PROJECT_UNINITIALIZED' }))
   const openMember = snapshot.members.find(member => member.id === openMemberId) || null
   const selectedMember = snapshot.members.find(member => member.id === selectedMemberId) || null
-  const checkRepository = async () => { try { const response = await fetch('/api/repository-status', { method: 'POST' }); const result = await response.json(); setRepository(result); return result } catch { const result = { mode: 'error', message: '저장소 상태를 확인할 수 없습니다.', project: {} }; setRepository(result); return result } }
-  const markSeen = result => { const markers = Object.fromEntries(Object.entries(result?.members || {}).filter(([, value]) => value.remoteNews && value.remoteTip).map(([id, value]) => [id, value.remoteTip])); const next = { ...seenNews, ...markers }; setSeenNews(next); localStorage.setItem('knowledge-guild-seen-news', JSON.stringify(next)) }
+  const checkRepository = async () => { try { const response = await fetch('/api/repository-status', { method: 'POST' }); const result = await response.json(); setRepository(result); setDismissedBarks({}); return result } catch { const result = { mode: 'error', message: '저장소 상태를 확인할 수 없습니다.', project: {} }; setRepository(result); return result } }
+  const confirmSeen = memberId => { const next = confirmMemberSeen(seenNews, memberId, repository); setSeenNews(next); localStorage.setItem('knowledge-guild-seen-news', JSON.stringify(next)); setChangesScope(null) }
+  const bark = selectRepositoryBark(snapshot.members, repository, seenNews, dismissedBarks)
 
   useEffect(() => {
     let active = true
@@ -278,16 +295,17 @@ function App() {
     <main className="village-app">
       <section className="village-map" aria-label="Knowledge Guild 마을">
         <VillageScenery />
-        <MissionBoard onAskProject={() => setAnswerTarget({ scope: 'project' })} onSkills={() => { setSkillScope({ scope: 'project', memberId: null }); setSkillDetail(null); setShowSkills(true) }} onRepositoryCheck={checkRepository} repository={repository} />
+        <MissionBoard onAskProject={() => setAnswerTarget({ scope: 'project' })} onSkills={() => { setSkillScope({ scope: 'project', memberId: null }); setSkillDetail(null); setShowSkills(true) }} onRepositoryCheck={checkRepository} onChanges={() => setChangesScope({ scope: 'project' })} repository={repository} />
         {snapshot.members.map((member, index) => (
-          <MemberHome key={member.id} member={member} index={index} pose={poseFor(member, repository, seenNews)} onEnter={() => setOpenMemberId(member.id)} onSelect={() => setSelectedMemberId(member.id)} />
+          <MemberHome key={member.id} member={member} index={index} pose={poseFor(member, repository, seenNews)} bark={bark?.member.id === member.id ? bark : null} onBarkOpen={() => setChangesScope({ scope: 'member', memberId: member.id })} onBarkDismiss={() => setDismissedBarks(value => ({ ...value, [bark.key]: true }))} onEnter={() => setOpenMemberId(member.id)} onSelect={() => setSelectedMemberId(member.id)} />
         ))}
         <div className="map-seal" aria-hidden="true"><b>KNOWLEDGE</b><span>GUILD</span></div>
       </section>
-      {selectedMember && <CharacterMenu member={selectedMember} onClose={() => setSelectedMemberId(null)} onAsk={() => { setAnswerTarget({ scope: 'personal', member: selectedMember }); setSelectedMemberId(null) }} onHome={() => { setOpenMemberId(selectedMember.id); setSelectedMemberId(null) }} onSkills={() => { setSkillScope({ scope: 'member', memberId: selectedMember.id }); setSkillDetail(null); setShowSkills(true); setSelectedMemberId(null) }} onChanges={() => { checkRepository().then(markSeen); setSelectedMemberId(null) }} />}
+      {selectedMember && <CharacterMenu member={selectedMember} onClose={() => setSelectedMemberId(null)} onAsk={() => { setAnswerTarget({ scope: 'personal', member: selectedMember }); setSelectedMemberId(null) }} onHome={() => { setOpenMemberId(selectedMember.id); setSelectedMemberId(null) }} onSkills={() => { setSkillScope({ scope: 'member', memberId: selectedMember.id }); setSkillDetail(null); setShowSkills(true); setSelectedMemberId(null) }} onChanges={() => { setChangesScope({ scope: 'member', memberId: selectedMember.id }); setSelectedMemberId(null) }} />}
       {openMember && <HouseInterior key={openMember.id} member={openMember} onClose={() => setOpenMemberId(null)} onAsk={member => { setOpenMemberId(null); setAnswerTarget({ scope: 'personal', member }) }} />}
       <AnswerPanel key={`${answerTarget.scope}-${answerTarget.member?.id || 'project'}`} target={answerTarget} docked onClose={() => setAnswerTarget({ scope: 'project' })} />
       {showSkills && <SkillStation skills={(snapshot.skills || []).filter(skill => skillScope.scope === 'member' ? skill.memberId === skillScope.memberId : skill.scope === 'project')} detail={skillDetail} onDetail={setSkillDetail} onClose={() => { setShowSkills(false); setSkillDetail(null) }} />}
+      {changesScope && <RepositoryChanges repository={repository} scope={changesScope.scope} member={snapshot.members.find(member => member.id === changesScope.memberId)} seenNews={seenNews} onConfirm={() => confirmSeen(changesScope.memberId)} onClose={() => setChangesScope(null)} />}
       <p className="sr-only" aria-live="polite">{openMember ? `${openMember.displayName}의 Wiki 집 내부` : '길드 마을'}</p>
     </main>
   )

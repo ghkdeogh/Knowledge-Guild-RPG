@@ -19,8 +19,12 @@ if (!css.includes('@media(max-width:800px)') || !css.includes('.room-content{dis
 if (!css.includes('.mission-board{') || !css.includes('.answer-panel{') || !css.includes('.source-drawer{')) throw new Error('Mission Board answer styling is missing')
 if (!css.includes('.onboarding-layer{') || !css.includes('.onboarding-card{') || !css.includes('@media(prefers-reduced-motion:no-preference)')) throw new Error('Accessible reduced-motion onboarding styling is missing')
 if (!app.includes('guild-prompt-dock') || !app.includes("/api/repository-status") || !app.includes('CharacterMenu') || !app.includes('SkillStation')) throw new Error('Guild prompt, repository projection, character menu, or skill station is missing')
+if (!app.includes('RepositoryBark') || !app.includes('RepositoryChanges') || !app.includes('confirmSeen') || app.includes('checkRepository().then(markSeen)')) throw new Error('Repository bark/change panel or explicit seen confirmation contract is missing')
+if (!app.includes('project-change-action') || !css.includes('.project-change-action')) throw new Error('Mobile project-only repository changes have no compact action')
+if (!app.includes("const memberId = member?.id || null") || !app.includes("'선택된 member 공개 Wiki 경로'")) throw new Error('Repository changes panel is not safe when its member record is unavailable')
 if (!app.includes('members/{member.id}/wiki/') || !app.includes('detail.readiness')) throw new Error('Scoped character action or non-executable skill disclosure is missing')
 if (!css.includes('.pose-crafting') || !css.includes('.pose-notice') || !css.includes('.guild-prompt-dock')) throw new Error('Repository pose or dock styles are missing')
+if (!css.includes('.repository-bark') || !css.includes('@media(prefers-reduced-motion:no-preference)')) throw new Error('Repository bark or reduced-motion visual guard is missing')
 for (const index of [...homeSpots.keys(), homeSpots.length, homeSpots.length + 1]) {
   const spot = memberHomePosition(index)
   if (!memberHomeIsClearOfPersistentUi(spot, 'desktop') || !memberHomeIsClearOfPersistentUi(spot, 'mobile')) throw new Error(`Member home ${index} overlaps a persistent UI region`)
