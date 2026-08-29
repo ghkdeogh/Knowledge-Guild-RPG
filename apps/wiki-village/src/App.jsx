@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import snapshot from './data/wiki-snapshot.json'
 import { isCurrentRequest } from './chat-request.js'
 import Onboarding from './Onboarding.jsx'
-import { homeSpots } from './village-layout.js'
+import { memberHomePosition } from './village-layout.js'
 
 const palette = ['sage', 'berry', 'ochre', 'lake', 'clay', 'plum', 'pine', 'sun']
 
@@ -28,9 +28,8 @@ function PixelAvatar({ member, tone, onEnter, onSelect, pose = 'neutral' }) {
 }
 
 function MemberHome({ member, index, onEnter, onSelect, pose }) {
-  const spot = homeSpots[index % homeSpots.length]
-  const ring = Math.floor(index / homeSpots.length)
-  const position = { left: `${Math.min(88, spot.x + ring * 2)}%`, top: `${Math.min(78, spot.y + ring * 2)}%` }
+  const spot = memberHomePosition(index)
+  const position = { left: `${spot.left}%`, top: `${spot.top}%` }
   const tone = palette[index % palette.length]
   const count = getMemberDocuments(member).length
 

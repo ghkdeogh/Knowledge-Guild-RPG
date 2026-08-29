@@ -9,6 +9,9 @@
     },
     "api/onboarding.mjs": {
       "includeFiles": "apps/wiki-village/{src/data/wiki-snapshot.json,core/wiki-architect.mjs,server/wiki-architect-application.mjs,server/project-wiki-architect.mjs}"
+    },
+    "api/repository-status.mjs": {
+      "includeFiles": "apps/wiki-village/src/data/wiki-snapshot.json"
     }
   }
 }

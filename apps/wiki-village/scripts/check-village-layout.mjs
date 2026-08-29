@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
-import { homeSpots, memberHomeIsClearOfPersistentUi } from '../src/village-layout.js'
+import { homeSpots, memberHomeIsClearOfPersistentUi, memberHomePosition } from '../src/village-layout.js'
 
 const root = resolve(import.meta.dirname, '..')
 const css = await readFile(resolve(root, 'src/styles.css'), 'utf8')
@@ -21,6 +21,9 @@ if (!css.includes('.onboarding-layer{') || !css.includes('.onboarding-card{') ||
 if (!app.includes('guild-prompt-dock') || !app.includes("/api/repository-status") || !app.includes('CharacterMenu') || !app.includes('SkillStation')) throw new Error('Guild prompt, repository projection, character menu, or skill station is missing')
 if (!app.includes('members/{member.id}/wiki/') || !app.includes('detail.readiness')) throw new Error('Scoped character action or non-executable skill disclosure is missing')
 if (!css.includes('.pose-crafting') || !css.includes('.pose-notice') || !css.includes('.guild-prompt-dock')) throw new Error('Repository pose or dock styles are missing')
-if (!memberHomeIsClearOfPersistentUi(homeSpots[0], 'desktop') || !memberHomeIsClearOfPersistentUi(homeSpots[0], 'mobile')) throw new Error('The first member home overlaps a persistent UI region')
+for (const index of [...homeSpots.keys(), homeSpots.length, homeSpots.length + 1]) {
+  const spot = memberHomePosition(index)
+  if (!memberHomeIsClearOfPersistentUi(spot, 'desktop') || !memberHomeIsClearOfPersistentUi(spot, 'mobile')) throw new Error(`Member home ${index} overlaps a persistent UI region`)
+}
 if (!css.includes('.mission-board{pointer-events:none}') || !css.includes('.mission-board button{pointer-events:auto}')) throw new Error('Mission Board must not block member-home hit targets outside its buttons')
 console.log('Validated full-viewport village, scoped Mission Board answers, safe source drawer, and responsive Wiki interiors.')

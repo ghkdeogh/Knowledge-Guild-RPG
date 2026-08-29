@@ -2,9 +2,8 @@
 // desktop and mobile viewports. These are conservative visual footprints, not
 // interaction coordinates: the CSS still owns the rendered size.
 export const homeSpots = [
-  { x: 72, y: 23 }, { x: 72, y: 21 }, { x: 13, y: 61 }, { x: 76, y: 59 },
-  { x: 34, y: 70 }, { x: 55, y: 72 }, { x: 34, y: 15 }, { x: 57, y: 14 },
-  { x: 6, y: 39 }, { x: 84, y: 39 }, { x: 23, y: 74 }, { x: 68, y: 76 },
+  { x: 72, y: 23 }, { x: 89, y: 10 }, { x: 89, y: 28 }, { x: 89, y: 44 },
+  { x: 89, y: 60 }, { x: 89, y: 74 }, { x: 10, y: 62 }, { x: 28, y: 62 },
 ]
 
 const persistentUi = {
@@ -24,6 +23,13 @@ const footprint = viewport => viewport === 'mobile'
 
 export function memberHomeIsClearOfPersistentUi(spot, viewport) {
   const size = footprint(viewport)
-  const rect = { left: spot.x - size.width / 2, right: spot.x + size.width / 2, top: spot.y - size.height / 2, bottom: spot.y + size.height / 2 }
+  const x = spot.x ?? spot.left; const y = spot.y ?? spot.top
+  const rect = { left: x - size.width / 2, right: x + size.width / 2, top: y - size.height / 2, bottom: y + size.height / 2 }
   return persistentUi[viewport].every(zone => rect.right <= zone.left || rect.left >= zone.right || rect.bottom <= zone.top || rect.top >= zone.bottom)
+}
+
+export function memberHomePosition(index) {
+  const spot = homeSpots[index % homeSpots.length]
+  const ring = Math.floor(index / homeSpots.length)
+  return { left: Math.min(92, spot.x + ring * 2), top: Math.min(78, spot.y + ring * 2) }
 }
