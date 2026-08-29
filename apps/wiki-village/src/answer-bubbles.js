@@ -39,3 +39,8 @@ export function answerBubbleView(projection) {
 }
 
 export const shouldHideRepositoryBark = projection => Boolean(projection?.phase === 'pending' || projection?.phase === 'answer')
+
+export function isValidatedAnswerEnvelope(body, target) {
+  const snapshot = answerTargetSnapshot(target)
+  return Boolean(body && body.sourceScope === snapshot.scope && body.memberId === snapshot.memberId && typeof body.answer === 'string' && Array.isArray(body.citations) && typeof body.confidence === 'string' && typeof body.knowledgeType === 'string' && typeof body.limitation === 'string' && typeof body.mode === 'string')
+}

@@ -4,7 +4,7 @@ import { isCurrentRequest } from './chat-request.js'
 import Onboarding from './Onboarding.jsx'
 import { memberHomePosition } from './village-layout.js'
 import { confirmMemberSeen, repositoryPathState, selectRepositoryBark } from './guild.js'
-import { answerBubbleView, answerTargetKey, beginAnswerProjection, resolveAnswerProjection, shouldHideRepositoryBark } from './answer-bubbles.js'
+import { answerBubbleView, answerTargetKey, beginAnswerProjection, isValidatedAnswerEnvelope, resolveAnswerProjection, shouldHideRepositoryBark } from './answer-bubbles.js'
 
 const palette = ['sage', 'berry', 'ochre', 'lake', 'clay', 'plum', 'pine', 'sun']
 
@@ -213,9 +213,7 @@ function AnswerPanel({ target, onClose, docked = false, onAnswerStart, onAnswerR
     try {
       const response = await fetch('/api/wiki-chat', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ scope, memberId: member?.id, question }), signal: controller.signal })
       const body = await response.json()
-      const hasExpectedScope = body && body.sourceScope === scope && (scope === 'personal' ? body.memberId === member?.id : body.memberId === null)
-      const hasEnvelope = body && typeof body.answer === 'string' && Array.isArray(body.citations) && typeof body.confidence === 'string' && typeof body.knowledgeType === 'string' && typeof body.limitation === 'string'
-      if (isCurrentRequest(nextRequest, requestId.current)) onAnswerResult?.(projectionRequestId, { scope, member }, response.ok && hasExpectedScope && hasEnvelope ? body : { mode: 'error', sourceScope: scope, answer: '지금은 답변을 가져오지 못했어요.', citations: [], confidence: 'low', knowledgeType: 'wiki-record', limitation: body?.error || '서버 응답의 범위 또는 계약을 확인하지 못했습니다.' })
+      if (isCurrentRequest(nextRequest, requestId.current)) onAnswerResult?.(projectionRequestId, { scope, member }, response.ok && isValidatedAnswerEnvelope(body, { scope, member }) ? body : { mode: 'error', sourceScope: scope, answer: '지금은 답변을 가져오지 못했어요.', citations: [], confidence: 'low', knowledgeType: 'wiki-record', limitation: body?.error || '서버 응답의 범위 또는 계약을 확인하지 못했습니다.' })
     } catch (error) {
       if (error.name !== 'AbortError' && isCurrentRequest(nextRequest, requestId.current)) onAnswerResult?.(projectionRequestId, { scope, member }, { mode: 'error', sourceScope: scope, answer: '지금은 답변을 가져오지 못했어요.', citations: [], confidence: 'low', knowledgeType: 'wiki-record', limitation: '네트워크 연결을 확인한 뒤 다시 시도하세요.' })
     } finally { window.clearTimeout(requestTimeout); if (isCurrentRequest(nextRequest, requestId.current)) setPending(false) }

@@ -1,4 +1,4 @@
-import { answerBubbleView, answerTargetKey, beginAnswerProjection, resolveAnswerProjection, shouldHideRepositoryBark } from '../src/answer-bubbles.js'
+import { answerBubbleView, answerTargetKey, beginAnswerProjection, isValidatedAnswerEnvelope, resolveAnswerProjection, shouldHideRepositoryBark } from '../src/answer-bubbles.js'
 
 const atlas = { scope: 'personal', member: { id: 'atlas', displayName: 'Atlas' } }
 const project = { scope: 'project' }
@@ -12,4 +12,5 @@ const unsupported = answerBubbleView({ ...resolved, reply: { ...reply, mode: 'un
 const error = answerBubbleView({ ...resolved, reply: { ...reply, mode: 'error', answer: 'invented answer' } })
 if (unsupported?.text !== '이 Wiki 기록에서는 답을 찾지 못했어요.' || error?.text !== '지금은 답변을 가져오지 못했어요.') throw new Error('Unsupported or error bubble invented an answer')
 if (answerTargetKey(project) !== 'project' || answerTargetKey({ scope: 'personal', memberId: 'atlas' }) !== 'personal:atlas') throw new Error('Project/member answer target isolation failed')
+if (!isValidatedAnswerEnvelope(reply, atlas) || isValidatedAnswerEnvelope({ ...reply, memberId: 'lumi' }, atlas) || isValidatedAnswerEnvelope({ ...reply, citations: 'not-an-array' }, atlas)) throw new Error('Malformed or cross-member answer envelope entered the bubble path')
 console.log('Validated scoped pending/answer projection, stale-response rejection, bubble modes, and repository-bark priority.')
