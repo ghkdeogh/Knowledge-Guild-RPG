@@ -40,10 +40,11 @@
         "score": 1
       },
       "activity": {
-        "id": "neutral",
-        "pose": "idle",
-        "label": "중립 대기",
-        "lastPublicActivity": null
+        "id": "crafting",
+        "pose": "crafting",
+        "label": "기록 정리",
+        "lastPublicActivity": "2026-08-29",
+        "days": 0
       }
     }
   ],
