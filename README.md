@@ -188,6 +188,7 @@ npm run test:provider-smoke # key + explicit opt-in 없으면 SKIP
 npm run test:deploy
 npm run test:layout
 npm run test:guild
+npm run test:answer-bubbles
 npm run build
 ```
 

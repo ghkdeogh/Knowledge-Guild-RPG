@@ -28,9 +28,12 @@ export function answerBubbleView(projection) {
   const reply = projection.reply
   if (!reply || typeof reply.answer !== 'string') return null
   const text = reply.mode === 'unsupported' ? '이 Wiki 기록에서는 답을 찾지 못했어요.' : reply.mode === 'error' ? '지금은 답변을 가져오지 못했어요.' : reply.answer
+  const excerpt = text.trim()
+  const truncated = excerpt.length > 120
   return {
     phase: 'answer',
-    text: text.slice(0, 180),
+    text: truncated ? `${excerpt.slice(0, 120).trimEnd()}…` : excerpt,
+    truncated,
     mode: reply.mode,
     modeLabel: modeLabel[reply.mode] || '응답 상태',
     confidence: reply.confidence,
@@ -42,5 +45,6 @@ export const shouldHideRepositoryBark = projection => Boolean(projection?.phase 
 
 export function isValidatedAnswerEnvelope(body, target) {
   const snapshot = answerTargetSnapshot(target)
-  return Boolean(body && body.sourceScope === snapshot.scope && body.memberId === snapshot.memberId && typeof body.answer === 'string' && Array.isArray(body.citations) && typeof body.confidence === 'string' && typeof body.knowledgeType === 'string' && typeof body.limitation === 'string' && typeof body.mode === 'string')
+  const allowedModes = new Set(['llm-grounded', 'demo-fallback', 'unsupported', 'error'])
+  return Boolean(body && body.sourceScope === snapshot.scope && body.memberId === snapshot.memberId && typeof body.answer === 'string' && Array.isArray(body.citations) && body.citations.every(item => item && typeof item.id === 'string') && typeof body.confidence === 'string' && typeof body.knowledgeType === 'string' && typeof body.limitation === 'string' && allowedModes.has(body.mode))
 }

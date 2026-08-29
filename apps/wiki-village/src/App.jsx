@@ -36,7 +36,7 @@ function RepositoryBark({ bark, onOpen, onDismiss }) {
 
 function AnswerBubble({ view, onOpen, onDismiss, project = false }) {
   if (!view) return null
-  if (view.phase === 'pending') return <aside className={`answer-bubble pending${project ? ' project-answer-bubble' : ''}`} aria-label="현재 UI 요청 상태"><span>{view.text}</span><small>{view.detail}</small></aside>
+  if (view.phase === 'pending') return <aside className={`answer-bubble pending${project ? ' project-answer-bubble' : ''}`} role="status" aria-live="polite" aria-label="현재 UI 요청 상태"><span>{view.text}</span><small>{view.detail}</small></aside>
   return <aside className={`answer-bubble${project ? ' project-answer-bubble' : ''}`} role="status" aria-live="polite" aria-label="Wiki 답변 도착"><button onClick={onOpen}><span>{view.text}</span><small>{view.modeLabel} · 신뢰도 {view.confidence} · {view.knowledgeType}</small><b>전체 답변 · 근거 보기</b></button><button className="bubble-dismiss" onClick={onDismiss} aria-label="이 답변 말풍선 닫기">×</button></aside>
 }
 
@@ -156,7 +156,7 @@ function MissionBoard({ onAskProject, onRepositoryCheck, onSkills, onChanges, re
   )
 }
 
-function AnswerPanel({ target, onClose, docked = false, onAnswerStart, onAnswerResult }) {
+function AnswerPanel({ target, onClose, docked = false, onAnswerStart, onAnswerResult, suspendKeyboard = false }) {
   const scope = target?.scope || 'project'
   const member = target?.member || null
   const [question, setQuestion] = useState('')
@@ -185,6 +185,7 @@ function AnswerPanel({ target, onClose, docked = false, onAnswerStart, onAnswerR
   }
   useEffect(() => {
     const onKeyDown = event => {
+      if (suspendKeyboard) return
       if (event.key === 'Escape') { closePanel(); return }
       if (event.key !== 'Tab') return
       const controls = [...(panelRef.current?.querySelectorAll('button:not([disabled]), textarea:not([disabled])') || [])]
@@ -198,7 +199,7 @@ function AnswerPanel({ target, onClose, docked = false, onAnswerStart, onAnswerR
       requestController.current?.abort()
       window.removeEventListener('keydown', onKeyDown)
     }
-  }, [])
+  }, [suspendKeyboard])
   const submit = async event => {
     event.preventDefault()
     if (!question.trim() || pending) return
@@ -206,16 +207,17 @@ function AnswerPanel({ target, onClose, docked = false, onAnswerStart, onAnswerR
     requestId.current = nextRequest
     requestController.current?.abort()
     const controller = new AbortController()
-    const requestTimeout = window.setTimeout(() => controller.abort(), 12000)
+    let timedOut = false
+    const requestTimeout = window.setTimeout(() => { timedOut = true; controller.abort() }, 12000)
     requestController.current = controller
     const projectionRequestId = onAnswerStart?.({ scope, member })
     setPending(true)
     try {
       const response = await fetch('/api/wiki-chat', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ scope, memberId: member?.id, question }), signal: controller.signal })
       const body = await response.json()
-      if (isCurrentRequest(nextRequest, requestId.current)) onAnswerResult?.(projectionRequestId, { scope, member }, response.ok && isValidatedAnswerEnvelope(body, { scope, member }) ? body : { mode: 'error', sourceScope: scope, answer: '지금은 답변을 가져오지 못했어요.', citations: [], confidence: 'low', knowledgeType: 'wiki-record', limitation: body?.error || '서버 응답의 범위 또는 계약을 확인하지 못했습니다.' })
+      if (isCurrentRequest(nextRequest, requestId.current)) onAnswerResult?.(projectionRequestId, { scope, member }, response.ok && isValidatedAnswerEnvelope(body, { scope, member }) ? body : { mode: 'error', sourceScope: scope, memberId: member?.id || null, answer: '지금은 답변을 가져오지 못했어요.', citations: [], confidence: 'low', knowledgeType: 'wiki-record', limitation: typeof body?.error === 'string' ? body.error : '서버 응답의 범위 또는 계약을 확인하지 못했습니다.' })
     } catch (error) {
-      if (error.name !== 'AbortError' && isCurrentRequest(nextRequest, requestId.current)) onAnswerResult?.(projectionRequestId, { scope, member }, { mode: 'error', sourceScope: scope, answer: '지금은 답변을 가져오지 못했어요.', citations: [], confidence: 'low', knowledgeType: 'wiki-record', limitation: '네트워크 연결을 확인한 뒤 다시 시도하세요.' })
+      if ((error.name !== 'AbortError' || timedOut) && isCurrentRequest(nextRequest, requestId.current)) onAnswerResult?.(projectionRequestId, { scope, member }, { mode: 'error', sourceScope: scope, memberId: member?.id || null, answer: '지금은 답변을 가져오지 못했어요.', citations: [], confidence: 'low', knowledgeType: 'wiki-record', limitation: timedOut ? '응답 시간이 초과되었습니다. 다시 시도하세요.' : '네트워크 연결을 확인한 뒤 다시 시도하세요.' })
     } finally { window.clearTimeout(requestTimeout); if (isCurrentRequest(nextRequest, requestId.current)) setPending(false) }
   }
   const scopeLabel = scope === 'personal' ? `${member?.displayName} 개인 Wiki` : '프로젝트 공통 기록'
@@ -235,18 +237,32 @@ const safeCitation = (item, target) => {
 
 function SourceDrawer({ document, onClose }) {
   if (!document) return null
-  return <aside className="source-drawer" aria-label="선택한 근거"><header><div><small>ALLOWLISTED SOURCE</small><h3>{document.title}</h3></div><button onClick={onClose}>닫기</button></header><p>{document.excerpt}</p><dl><div><dt>Source path</dt><dd><code>{document.source}</code></dd></div><div><dt>Scope</dt><dd>{document.scope}</dd></div><div><dt>Record type</dt><dd>{document.knowledgeType}</dd></div></dl></aside>
+  return <aside className="source-drawer" role="region" aria-label="선택한 근거"><header><div><small>ALLOWLISTED SOURCE</small><h3>{document.title}</h3></div><button onClick={onClose} autoFocus>닫기</button></header><p>{document.excerpt}</p><dl><div><dt>Source path</dt><dd><code>{document.source}</code></dd></div><div><dt>Scope</dt><dd>{document.scope}</dd></div><div><dt>Record type</dt><dd>{document.knowledgeType}</dd></div></dl></aside>
 }
 
 function GuildAnswerScroll({ projection, onClose, onRetry }) {
   const [drawer, setDrawer] = useState(null)
+  const scrollRef = useRef(null)
+  const citationReturnFocus = useRef(null)
   const reply = projection?.reply
   const target = projection?.target
   const cited = (reply?.citations || []).map(item => safeCitation(item, target)).filter(Boolean)
-  useEffect(() => { const close = event => event.key === 'Escape' && onClose(); window.addEventListener('keydown', close); return () => window.removeEventListener('keydown', close) }, [onClose])
+  useEffect(() => {
+    const onKeyDown = event => {
+      if (event.key === 'Escape') { event.stopPropagation(); onClose(); return }
+      if (event.key !== 'Tab') return
+      const controls = [...(scrollRef.current?.querySelectorAll('button:not([disabled])') || [])]
+      if (!controls.length) return
+      const first = controls[0]; const last = controls.at(-1)
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus() }
+      if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [onClose, drawer])
   if (!reply || !target) return null
   const label = target.scope === 'personal' ? `${target.displayName} 개인 Wiki` : '프로젝트 공통 기록'
-  return <aside className="guild-answer-scroll" role="dialog" aria-modal="true" aria-label={`${label} 전체 답변`}><header><div><small>GUILD ANSWER SCROLL</small><h2>{label}</h2><p>{modeCopy[reply.mode] || '응답 상태'} · {reply.sourceScope}</p></div><button className="exit-button" onClick={onClose} autoFocus>닫기</button></header><div className="answer-labels"><span>신뢰도: {reply.confidence}</span><span>기록 유형: {reply.knowledgeType}</span></div><p className="answer-text">{reply.mode === 'unsupported' ? '이 Wiki 기록에서는 답을 찾지 못했어요.' : reply.mode === 'error' ? '지금은 답변을 가져오지 못했어요.' : reply.answer}</p><p className="answer-limitation"><b>한계</b> {reply.limitation}</p>{reply.mode === 'error' && <button className="retry-answer" onClick={onRetry}>Guild Prompt에서 다시 질문하기</button>}<section className="scroll-citations"><h3>허용된 근거</h3>{cited.length ? cited.map(document => <button key={document.id} onClick={() => setDrawer(document)}>근거 열기: {document.title}</button>) : <p>이 답변에는 표시할 허용 근거가 없습니다.</p>}</section><SourceDrawer document={drawer} onClose={() => setDrawer(null)} /></aside>
+  return <aside className="guild-answer-scroll" ref={scrollRef} role="dialog" aria-modal="true" aria-label={`${label} 전체 답변`}><header><div><small>GUILD ANSWER SCROLL</small><h2>{label}</h2><p>{modeCopy[reply.mode] || '응답 상태'} · {reply.sourceScope}</p></div><button className="exit-button" onClick={onClose} autoFocus>닫기</button></header><div className="answer-labels"><span>신뢰도: {reply.confidence}</span><span>기록 유형: {reply.knowledgeType}</span></div><p className="answer-text">{reply.mode === 'unsupported' ? '이 Wiki 기록에서는 답을 찾지 못했어요.' : reply.mode === 'error' ? '지금은 답변을 가져오지 못했어요.' : reply.answer}</p><p className="answer-limitation"><b>한계</b> {reply.limitation}</p>{reply.mode === 'error' && <button className="retry-answer" onClick={onRetry}>Guild Prompt에서 다시 질문하기</button>}<section className="scroll-citations"><h3>허용된 근거</h3>{cited.length ? cited.map(document => <button key={document.id} onClick={event => { citationReturnFocus.current = event.currentTarget; setDrawer(document) }}>근거 열기: {document.title}</button>) : <p>이 답변에는 표시할 허용 근거가 없습니다.</p>}</section><SourceDrawer document={drawer} onClose={() => { setDrawer(null); window.setTimeout(() => citationReturnFocus.current?.focus?.(), 0) }} /></aside>
 }
 
 function VillageScenery() {
@@ -338,7 +354,7 @@ function App() {
       </section>
       {selectedMember && <CharacterMenu member={selectedMember} onClose={() => setSelectedMemberId(null)} onAsk={() => { setScopedAnswerTarget({ scope: 'personal', member: selectedMember }); setSelectedMemberId(null) }} onHome={() => { setOpenMemberId(selectedMember.id); setSelectedMemberId(null) }} onSkills={() => { setSkillScope({ scope: 'member', memberId: selectedMember.id }); setSkillDetail(null); setShowSkills(true); setSelectedMemberId(null) }} onChanges={event => { openChanges('member', selectedMember.id, event.currentTarget); setSelectedMemberId(null) }} />}
       {openMember && <HouseInterior key={openMember.id} member={openMember} onClose={() => setOpenMemberId(null)} onAsk={member => { setOpenMemberId(null); setScopedAnswerTarget({ scope: 'personal', member }) }} />}
-      <AnswerPanel key={`${answerTarget.scope}-${answerTarget.member?.id || 'project'}`} target={answerTarget} docked onClose={() => setScopedAnswerTarget({ scope: 'project' })} onAnswerStart={beginAnswer} onAnswerResult={receiveAnswer} />
+      <AnswerPanel key={`${answerTarget.scope}-${answerTarget.member?.id || 'project'}`} target={answerTarget} docked suspendKeyboard={showAnswerScroll} onClose={() => setScopedAnswerTarget({ scope: 'project' })} onAnswerStart={beginAnswer} onAnswerResult={receiveAnswer} />
       {showSkills && <SkillStation skills={(snapshot.skills || []).filter(skill => skillScope.scope === 'member' ? skill.memberId === skillScope.memberId : skill.scope === 'project')} detail={skillDetail} onDetail={setSkillDetail} onClose={() => { setShowSkills(false); setSkillDetail(null) }} />}
       {changesScope && <RepositoryChanges repository={repository} scope={changesScope.scope} member={snapshot.members.find(member => member.id === changesScope.memberId)} seenNews={seenNews} onConfirm={() => confirmSeen(changesScope.memberId)} onClose={closeChanges} />}
       {showAnswerScroll && answerProjection?.phase === 'answer' && <GuildAnswerScroll projection={answerProjection} onClose={closeAnswerScroll} onRetry={focusComposer} />}
