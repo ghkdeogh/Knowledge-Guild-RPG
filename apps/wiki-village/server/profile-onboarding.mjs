@@ -21,6 +21,11 @@ const fieldMaps = {
   recording: { gaps: [['흩어진', '정보가 흩어짐'], ['메모', '메모의 연결 부족'], ['근거', '판단 근거 추적의 어려움']], vision: [['연결', '연결된 기록'], ['재사용', '재사용 가능한 지식'], ['정리', '지속 가능한 정리']] },
   outputs: { audiences: [['동료', '동료'], ['팀', '팀'], ['고객', '고객'], ['나 자신', '본인']], formats: [['markdown', 'Markdown'], ['마크다운', 'Markdown'], ['보고서', '보고서'], ['문서', '문서']], oneYearState: [['1년', '1년 뒤에도 재사용 가능한 상태'], ['재사용', '재사용 가능한 상태'], ['지도', '지식 지도를 갖춘 상태']], aiExpectations: [['조사', '조사 지원'], ['분석', '분석 지원'], ['검증', '검증 지원']], workRules: [['근거', '근거를 남긴다'], ['확인', '확인 후 진행한다'], ['승인', '승인 후 저장한다']] },
 }
+const providerFields = {
+  identity: ['roles', 'strengths', 'values'],
+  recording: ['gaps', 'vision'],
+  outputs: ['audiences', 'formats', 'oneYearState', 'aiExpectations', 'workRules'],
+}
 
 const exists = path => access(path).then(() => true).catch(() => false)
 const clean = (value, max = 4000) => typeof value === 'string' ? value.replace(/\u0000/g, '').replace(/\r\n/g, '\n').trim().slice(0, max) : ''
@@ -77,18 +82,24 @@ const localTopicInterpretation = (question, answer, seed) => {
   for (const key of ['vision', 'oneYearState']) if (Array.isArray(fields[key])) fields[key] = fields[key][0] || ''
   return { mode: 'local-draft', topic: question.topic, fields, summary: topicSummary(question.topic, fields), seedFocus: seed?.focus || '' }
 }
-const topicSchema = { type: 'object', additionalProperties: false, required: ['summary', 'roles', 'strengths', 'values', 'gaps', 'vision', 'audiences', 'formats', 'oneYearState', 'aiExpectations', 'workRules'], properties: Object.fromEntries(['summary', 'vision', 'oneYearState'].map(key => [key, { type: 'string' }]).concat(['roles', 'strengths', 'values', 'gaps', 'audiences', 'formats', 'aiExpectations', 'workRules'].map(key => [key, { type: 'array', items: { type: 'string' } }]))) }
+const evidenceItemSchema = { type: 'object', additionalProperties: false, required: ['value', 'evidence'], properties: { value: { type: 'string' }, evidence: { type: 'string' } } }
+const topicSchema = { type: 'object', additionalProperties: false, required: ['roles', 'strengths', 'values', 'gaps', 'vision', 'audiences', 'formats', 'oneYearState', 'aiExpectations', 'workRules'], properties: Object.fromEntries(Object.values(providerFields).flat().map(key => [key, { type: 'array', items: evidenceItemSchema }])) }
+const normalized = value => clean(value, 4000).replace(/\s+/g, ' ')
+const evidenceBacked = (item, source) => {
+  const value = clean(item?.value, 64)
+  const evidence = clean(item?.evidence, 160)
+  const normalizedValue = normalized(value); const normalizedEvidence = normalized(evidence)
+  if (!normalizedValue || !normalizedEvidence || normalizedEvidence.length < 2 || !source.includes(normalizedEvidence)) return ''
+  if (!normalizedEvidence.includes(normalizedValue) && !normalizedValue.includes(normalizedEvidence)) return ''
+  if (/[\r\n.!?]/.test(value) || normalizedValue.length > 32) return ''
+  if (normalizedValue === normalizedEvidence && normalizedEvidence.length > 20) return ''
+  if (normalizedValue.length > 16 && source.includes(normalizedValue)) return ''
+  return value
+}
 const sanitizedProviderTopic = (question, candidate, seed) => {
-  const map = fieldMaps[question.id]
   const fields = {}
-  const source = [candidate?.__answer || '', seed?.content || ''].join('\n')
-  for (const key of Object.keys(map)) {
-    const value = candidate?.[key]
-    const allowed = new Set(map[key].map(([, label]) => label))
-    const supported = new Set(matches(source, map[key]))
-    const accepted = (Array.isArray(value) ? value : [value]).map(item => clean(item, 80)).filter(item => allowed.has(item) && supported.has(item)).slice(0, 5)
-    fields[key] = Array.isArray(value) ? accepted : accepted[0] || ''
-  }
+  const source = normalized([candidate?.__answer || '', seed?.content || ''].join('\n'))
+  for (const key of providerFields[question.id]) fields[key] = (Array.isArray(candidate?.[key]) ? candidate[key] : []).map(item => evidenceBacked(item, source)).filter(Boolean).slice(0, 5)
   const summary = topicSummary(question.topic, fields)
   return { mode: 'llm-suggestion', topic: question.topic, fields, summary, seedFocus: seed?.focus || '' }
 }
@@ -100,7 +111,7 @@ async function interpretTopic(question, answer, seed, options) {
     if (typeof options?.profileInterpreter === 'function') return sanitizedProviderTopic(question, { ...await options.profileInterpreter({ question: question.id, answer, seed: seed?.content || '' }), __answer: answer }, seed)
     if (!options?.responsesClient && !options?.providerConfig?.apiKey) return fallback
     const client = options.responsesClient || new (await import('openai')).default({ apiKey: options.providerConfig.apiKey })
-    const response = await client.responses.create({ model: options.providerConfig?.model || 'gpt-5.6-terra', store: false, ...(options.providerConfig?.reasoningEffort ? { reasoning: { effort: options.providerConfig.reasoningEffort } } : {}), instructions: 'Return only strict Korean JSON. Extract only explicitly supported structured fields for one personal onboarding answer. Never quote, paraphrase closely, or reproduce source sentences. Leave unsupported fields empty. Do not infer facts.', input: `Topic: ${question.topic}\nApproved seed category: ${seed?.focus || '(none)'}\nCurrent answer: ${answer}`, text: { format: { type: 'json_schema', name: 'profile_topic_summary', strict: true, schema: topicSchema } } })
+    const response = await client.responses.create({ model: options.providerConfig?.model || 'gpt-5.6-terra', store: false, ...(options.providerConfig?.reasoningEffort ? { reasoning: { effort: options.providerConfig.reasoningEffort } } : {}), instructions: 'Return only strict Korean JSON. For the current topic only, provide at most five generic structured items per allowed field. Every item needs a short normalized value and exact source evidence. Evidence is validation-only and will never be saved. Do not quote full sentences, do not put evidence in value, do not infer facts, and leave unsupported fields empty.', input: `Topic: ${question.topic}\nApproved private seed (bounded; provider consent obtained): ${seed?.content || '(none)'}\nCurrent answer (provider consent obtained): ${answer}`, text: { format: { type: 'json_schema', name: 'profile_topic_summary', strict: true, schema: topicSchema } } })
     const output = typeof response.output_text === 'string' ? response.output_text : ''
     return sanitizedProviderTopic(question, { ...JSON.parse(output), __answer: answer }, seed)
   } catch { return fallback }
@@ -132,10 +143,10 @@ function requireState(value) {
   if (!value || typeof value !== 'object' || value.version !== 1) fail('온보딩 세션을 먼저 시작해 주세요.', 'invalid-session')
   return value
 }
-function questionEvent(index, seed) {
+function questionEvent(index, seed, providerAllowed = false) {
   const question = questions[index]
   const tailored = seed?.focus ? ` 승인된 개인 seed의 ${seed.focus} 맥락을 고려해 답해 주세요.` : ''
-  return event('question.asked', { id: question.id, topic: question.topic, question: `${question.question}${tailored}`, count: index + 1, total: questions.length })
+  return event('question.asked', { id: question.id, topic: question.topic, mode: providerAllowed ? 'llm-suggestion' : 'local-draft', question: `${question.question}${tailored}`, count: index + 1, total: questions.length })
 }
 
 export function renderProfileFiles(state) {
@@ -145,11 +156,14 @@ export function renderProfileFiles(state) {
   const recording = answers.find(answer => answer.id === 'recording')?.fields || {}
   const outputs = answers.find(answer => answer.id === 'outputs')?.fields || {}
   const list = values => Array.isArray(values) ? values.map(value => `- ${value}`).join('\n') : ''
+  const first = value => Array.isArray(value) ? value[0] || '' : value || ''
+  const vision = first(recording.vision)
+  const oneYearState = first(outputs.oneYearState)
   const seedContext = state.seed?.focus ? `- 승인된 seed에서 확인한 일반 맥락: ${state.seed.focus}` : ''
   const summaryMode = answers.some(answer => answer.mode === 'local-draft') ? 'local-draft' : 'llm-suggestion'
   const heading = `# ${state.displayName}의 프로필`
-  const profile = `${heading}\n\n> 아래 내용은 원문 답변이나 seed 원문이 아닌, 승인 전 화면으로 확인한 구조화 요약입니다. 해석 모드: ${summaryMode}.\n\n## 나의 맥락 요약\n\n${[seedContext, ...answers.map(answer => `- ${answer.summary}`)].filter(Boolean).join('\n')}\n\n## 사실로 확인된 내용\n\n- 표시 이름: ${state.displayName}\n${seedContext}\n\n## 나의 관점과 선호\n\n### 나는 누구인가\n\n${list(identity.strengths)}\n${list(identity.values)}\n\n### 기록하려는 이유\n\n${list(recording.gaps)}\n${recording.vision ? `- 바라는 모습: ${recording.vision}` : ''}\n\n### 원하는 결과물\n\n${list(outputs.audiences)}\n${list(outputs.formats)}\n${outputs.oneYearState ? `- 1년 뒤: ${outputs.oneYearState}` : ''}\n\n## 아직 알 수 없는 내용\n\n`
-  const context = `# ${state.displayName} Context\n\n> 이 문서는 승인된 PROFILE.md에서 매 실행 시 빠르게 읽기 위한 provider-neutral 요약입니다. 해석 모드: ${summaryMode}. 원문 답변과 seed 원문은 저장하지 않습니다.\n\n## 나는 누구인가\n\n${[...list(identity.strengths).split('\n'), ...list(identity.values).split('\n'), seedContext].filter(Boolean).join('\n')}\n\n## 나의 역할들\n\n${list(identity.roles)}\n\n## 나의 비전과 목표\n\n${[...list(recording.gaps).split('\n'), recording.vision ? `- ${recording.vision}` : '', ...list(outputs.audiences).split('\n'), outputs.oneYearState ? `- ${outputs.oneYearState}` : ''].filter(Boolean).join('\n')}\n\n## AI에게 기대하는 것\n\n${list(outputs.aiExpectations)}\n\n## 작업 규칙\n\n${list(outputs.workRules)}\n`
+  const profile = `${heading}\n\n> 아래 내용은 원문 답변이나 seed 원문이 아닌, 승인 전 화면으로 확인한 구조화 요약입니다. 해석 모드: ${summaryMode}.\n\n## 나의 맥락 요약\n\n${[seedContext, ...answers.map(answer => `- ${answer.summary}`)].filter(Boolean).join('\n')}\n\n## 사실로 확인된 내용\n\n- 표시 이름: ${state.displayName}\n${seedContext}\n\n## 나의 관점과 선호\n\n### 나는 누구인가\n\n${list(identity.strengths)}\n${list(identity.values)}\n\n### 기록하려는 이유\n\n${list(recording.gaps)}\n${vision ? `- 바라는 모습: ${vision}` : ''}\n\n### 원하는 결과물\n\n${list(outputs.audiences)}\n${list(outputs.formats)}\n${oneYearState ? `- 1년 뒤: ${oneYearState}` : ''}\n\n## 아직 알 수 없는 내용\n\n`
+  const context = `# ${state.displayName} Context\n\n> 이 문서는 승인된 PROFILE.md에서 매 실행 시 빠르게 읽기 위한 provider-neutral 요약입니다. 해석 모드: ${summaryMode}. 원문 답변과 seed 원문은 저장하지 않습니다.\n\n## 나는 누구인가\n\n${[...list(identity.strengths).split('\n'), ...list(identity.values).split('\n'), seedContext].filter(Boolean).join('\n')}\n\n## 나의 역할들\n\n${list(identity.roles)}\n\n## 나의 비전과 목표\n\n${[...list(recording.gaps).split('\n'), vision ? `- ${vision}` : '', ...list(outputs.audiences).split('\n'), ...list(outputs.formats).split('\n'), oneYearState ? `- ${oneYearState}` : ''].filter(Boolean).join('\n')}\n\n## AI에게 기대하는 것\n\n${list(outputs.aiExpectations)}\n\n## 작업 규칙\n\n${list(outputs.workRules)}\n`
   const base = `members/${state.memberId}`
   return { [`${base}/PROFILE.md`]: profile, [`${base}/CONTEXT.md`]: context }
 }
@@ -215,7 +229,7 @@ export async function advanceProfileOnboarding(current, input = {}, options = {}
       return { state: next, events: [event('answer.received', { id: 'display-name' }), event('question.asked', { id: 'member-id', question: '저장 경로에 사용할 member-id를 알려주세요. 영문 소문자, 숫자, 하이픈만 사용할 수 있습니다.' })] }
     }
     const next = session('privacy', { ...state, displayName, memberId: derivedId })
-    return { state: next, events: [event('answer.received', { id: 'display-name' }), event('privacy.warning', { message: 'PROFILE.md와 CONTEXT.md는 Git에 커밋되면 저장소 접근자가 읽을 수 있습니다. 공유해도 되는 내용만 답변해 주세요. 외부 AI 제공자에 답변을 보내는 것은 기본값이 아니며 providerApproved: true를 별도로 선택할 때만 가능합니다.' }), event('privacy.confirmation.required', { question: '공개 범위를 이해했고, 공유 가능한 내용만 답변하시겠어요?' })] }
+    return { state: next, events: [event('answer.received', { id: 'display-name' }), event('privacy.warning', { message: 'PROFILE.md와 CONTEXT.md는 Git에 커밋되면 저장소 접근자가 읽을 수 있습니다. 공유해도 되는 내용만 답변해 주세요. 외부 AI 제공자에 답변과 승인된 seed 원문을 보내는 것은 기본값이 아니며 providerApproved: true를 별도로 선택할 때만 가능합니다.' }), event('privacy.confirmation.required', { question: '공개 범위를 이해했고, 공유 가능한 내용만 답변하시겠어요?' })] }
   }
   if (state.phase === 'member-id') {
     if (action !== 'answer') fail('저장용 member-id에 답해 주세요.', 'unexpected-action')
@@ -223,14 +237,14 @@ export async function advanceProfileOnboarding(current, input = {}, options = {}
     const memberId = safeMemberId(input.answer)
     memberPath(repoRoot, memberId)
     const next = session('privacy', { ...state, memberId })
-    return { state: next, events: [event('answer.received', { id: 'member-id' }), event('privacy.warning', { message: 'PROFILE.md와 CONTEXT.md는 Git에 커밋되면 저장소 접근자가 읽을 수 있습니다. 공유해도 되는 내용만 답변해 주세요. 외부 AI 제공자에 답변을 보내는 것은 기본값이 아니며 providerApproved: true를 별도로 선택할 때만 가능합니다.' }), event('privacy.confirmation.required', { question: '공개 범위를 이해했고, 공유 가능한 내용만 답변하시겠어요?' })] }
+    return { state: next, events: [event('answer.received', { id: 'member-id' }), event('privacy.warning', { message: 'PROFILE.md와 CONTEXT.md는 Git에 커밋되면 저장소 접근자가 읽을 수 있습니다. 공유해도 되는 내용만 답변해 주세요. 외부 AI 제공자에 답변과 승인된 seed 원문을 보내는 것은 기본값이 아니며 providerApproved: true를 별도로 선택할 때만 가능합니다.' }), event('privacy.confirmation.required', { question: '공개 범위를 이해했고, 공유 가능한 내용만 답변하시겠어요?' })] }
   }
   if (state.phase === 'privacy') {
     if (action !== 'privacy' || input.approved !== true) fail('세 질문을 시작하기 전에 공개 범위를 명시적으로 확인해 주세요.', 'privacy-confirmation-required')
     const seed = await loadApprovedSeed(repoRoot, state.memberId)
     const next = session('question', { ...state, seed, providerAllowed: input.providerApproved === true, questionIndex: 0 })
     const seedEvent = seed ? event('seed.loaded', { path: seed.path, digest: seed.digest, characters: seed.characters, note: '승인된 seed는 참조했지만 원문을 새 프로필에 자동 복사하지 않습니다.' }) : event('seed.missing', { note: '허용된 seed 파일이 없어 인터뷰 답변만 사용합니다.' })
-    return { state: next, events: [event('privacy.confirmed'), event('provider.consent', { enabled: input.providerApproved === true }), seedEvent, questionEvent(0, seed)] }
+    return { state: next, events: [event('privacy.confirmed'), event('provider.consent', { enabled: input.providerApproved === true }), seedEvent, questionEvent(0, seed, input.providerApproved === true)] }
   }
   if (state.phase === 'question') {
     if (action !== 'answer') fail('현재 질문 하나에만 답해 주세요.', 'unexpected-action')
@@ -243,7 +257,7 @@ export async function advanceProfileOnboarding(current, input = {}, options = {}
     const summaryEvent = event('answer.summarized', { id: question.id, topic: question.topic, mode: answers.at(-1).mode, summary: answers.at(-1).summary })
     if (state.questionIndex + 1 < questions.length) {
       const next = session('question', { ...state, answers, questionIndex: state.questionIndex + 1 })
-      return { state: next, events: [event('answer.received', { id: question.id }), summaryEvent, questionEvent(next.questionIndex, state.seed)] }
+      return { state: next, events: [event('answer.received', { id: question.id }), summaryEvent, questionEvent(next.questionIndex, state.seed, state.providerAllowed)] }
     }
     const safeSeed = state.seed ? { path: state.seed.path, digest: state.seed.digest, characters: state.seed.characters, focus: state.seed.focus } : null
     const next = session('preview', { ...state, answers, seed: safeSeed, questionIndex: questions.length })

@@ -22,7 +22,7 @@ For profile-first onboarding, say **“온보딩 시작해줘”** or use the st
 '@ | node scripts/profile-onboarding-cli.mjs
 ```
 
-Continue the same session with the three `{"action":"answer","answer":"..."}` topic replies. The third reply emits `approval.required` with `<digest>`; then send `{"action":"approve","expectedDigest":"<digest>"}` and `{"action":"save","expectedDigest":"<digest>"}`. A fresh process starts a fresh session, so do not use a one-shot pipe for the approval step. The credential-free `local-draft` interpreter is the default; when a configured external AI provider may receive interview answers, include `"providerApproved":true` only in the privacy confirmation after reviewing that transfer.
+Continue the same session with the three `{"action":"answer","answer":"..."}` topic replies. The third reply emits `approval.required` with `<digest>`; then send `{"action":"approve","expectedDigest":"<digest>"}` and `{"action":"save","expectedDigest":"<digest>"}`. A fresh process starts a fresh session, so do not use a one-shot pipe for the approval step. The credential-free `local-draft` interpreter is the default; when a configured external AI provider may receive interview answers and approved seed content, include `"providerApproved":true` only in the privacy confirmation after reviewing that transfer.
 
 ## Village states
 

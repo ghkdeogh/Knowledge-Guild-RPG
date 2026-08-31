@@ -1,11 +1,12 @@
 import { createInterface } from 'node:readline'
 import { resolve } from 'node:path'
 import { advanceProfileOnboarding, startProfileOnboarding } from '../server/profile-onboarding.mjs'
+import { loadProfileProviderConfig } from '../server/profile-provider-config.mjs'
 
 const args = process.argv.slice(2)
 const value = key => args.includes(key) ? args[args.indexOf(key) + 1] : null
 const repoRoot = value('--repo-root') ? resolve(value('--repo-root')) : resolve('..', '..')
-const providerConfig = { apiKey: process.env.OPENAI_API_KEY, model: process.env.OPENAI_MODEL || 'gpt-5.6-terra', reasoningEffort: process.env.OPENAI_REASONING_EFFORT || 'low' }
+const providerConfig = await loadProfileProviderConfig()
 const emit = item => process.stdout.write(`${JSON.stringify(item)}\n`)
 let state
 const input = createInterface({ input: process.stdin, crlfDelay: Infinity })
