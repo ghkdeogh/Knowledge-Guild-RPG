@@ -89,10 +89,10 @@ const evidenceBacked = (item, source) => {
   const value = clean(item?.value, 64)
   const evidence = clean(item?.evidence, 160)
   const normalizedValue = normalized(value); const normalizedEvidence = normalized(evidence)
-  if (!normalizedValue || !normalizedEvidence || normalizedEvidence.length < 2 || !source.includes(normalizedEvidence)) return ''
+  if (!normalizedValue || !normalizedEvidence || normalizedEvidence.length < 4 || !source.includes(normalizedEvidence)) return ''
   if (!normalizedEvidence.includes(normalizedValue) && !normalizedValue.includes(normalizedEvidence)) return ''
+  if (normalizedEvidence === normalizedValue || normalizedEvidence.length <= normalizedValue.length + 1) return ''
   if (/[\r\n.!?]/.test(value) || normalizedValue.length > 32) return ''
-  if (normalizedValue === normalizedEvidence && normalizedEvidence.length > 20) return ''
   if (normalizedValue.length > 16 && source.includes(normalizedValue)) return ''
   return value
 }
