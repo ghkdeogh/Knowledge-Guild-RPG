@@ -12,6 +12,16 @@ Create a project with the JSONL CLI, not the browser:
 
 Use `preview` with the returned blueprint, then submit the approved digest to `save`. That default CLI flow creates only the requested member's personal Wiki; the browser remains read-only. Use `preview-workspace` and `save-workspace` only when an explicit project-and-member scaffold is needed. `npm run build` safely rebuilds the snapshot before creating the production bundle.
 
+For profile-first onboarding, use the streaming JSONL command. It asks for a name first, requires a public-scope confirmation, then asks exactly three questions one at a time. It only writes approved `PROFILE.md` and provider-neutral `CONTEXT.md` in the selected member scope after preview, digest approval, and a separate save request:
+
+```powershell
+@'
+{"action":"start","memberId":"my-member"}
+{"action":"answer","answer":"이름"}
+{"action":"privacy","approved":true}
+'@ | node scripts/profile-onboarding-cli.mjs
+```
+
 ## Village states
 
 - `FLOW_UNINITIALIZED`: no public Wiki record; one CLI `analyze` command, no hall, characters, or example data.

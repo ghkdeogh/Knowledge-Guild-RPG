@@ -81,6 +81,10 @@ node scripts/release-quickstart.mjs --target <new-absolute-directory-outside-thi
 
 웹에서 공개 기록이 없으면 건물이나 예제 member 없이 아래 CLI 시작 명령만 보입니다. 첫 입력은 아이디어, 조사, 문제의식, 실험 기록 또는 자유 프로젝트 메모 어느 것이든 됩니다. `analyze` 뒤에는 실제 blueprint로 `preview`를 확인하고, digest를 넣은 `save`를 승인해 실행하세요. 기본 경로는 요청한 member의 개인 Wiki만 만듭니다. 공개 개인 Wiki 기록을 남긴 다음 snapshot build에서 관찰 흐름과 member가 마을에 투영됩니다.
 
+### 개인 프로필 온보딩
+
+개인 작업 맥락부터 정리하려면 `profile-onboarding-cli.mjs`를 사용합니다. 스트리밍 JSONL은 이름을 먼저 묻고, 공개 범위를 명시 확인한 뒤 `나는 누구인가 → 기록하려는 이유 → 원하는 결과물`의 세 질문만 한 번에 하나씩 진행합니다. 각 답변 뒤 요약과 다음 질문을 출력하며, 마지막에는 `PROFILE.md`와 provider-neutral `CONTEXT.md`의 preview/digest를 냅니다. `approve`와 별도 `save`가 모두 있어야만 선택한 `members/<member-id>/`에 저장됩니다. 기본 흐름은 `projects/`를 만들거나 바꾸지 않으며 `CLAUDE.md`도 생성하지 않습니다.
+
 ## CLI 사용법
 
 CLI도 화면과 같은 core를 사용합니다. 아래 명령은 `apps/wiki-village` 폴더에서 실행합니다. 모든 출력은 자동화에 쓰기 쉬운 JSONL(한 줄에 JSON 하나)입니다.

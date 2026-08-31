@@ -16,6 +16,8 @@
     "test:snapshot": "node scripts/check-wiki-snapshot.mjs",
     "test:chat": "node scripts/check-wiki-chat.mjs",
     "test:onboarding": "node scripts/check-onboarding.mjs",
+    "test:profile-onboarding": "node scripts/check-profile-onboarding.mjs",
+    "profile-onboarding": "node scripts/profile-onboarding-cli.mjs",
     "test:provider-smoke": "node scripts/check-provider-smoke.mjs",
     "quickstart": "node scripts/release-quickstart.mjs --temp",
     "wiki-architect": "node scripts/wiki-architect.mjs",
