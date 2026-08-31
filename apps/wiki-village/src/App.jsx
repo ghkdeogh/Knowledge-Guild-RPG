@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import snapshot from './data/wiki-snapshot.json'
 import { activityDescription, memberActivity, repositoryPathState } from './guild.js'
 import { memberHomePosition } from './village-layout.js'
-import { canRenderVillage, memberPublicChanges, publicMemberDocuments, publicMemberSkills } from './village-view.js'
+import { canRenderVillage, memberPublicChanges, publicFlowDocuments, publicMemberDocuments, publicMemberSkills } from './village-view.js'
 
 const palette = ['sage', 'berry', 'ochre', 'lake', 'clay', 'plum', 'pine', 'sun']
 
@@ -27,10 +27,10 @@ function VillageScenery() {
   </>
 }
 
-function GuildHall({ project }) {
-  return <section className="guild-hall" aria-label={`${project.title} 프로젝트 길드홀`}>
+function GuildHall({ flow }) {
+  return <section className="guild-hall" aria-label="관찰된 프로젝트 흐름">
     <i className="hall-flag" /><i className="hall-roof" /><i className="hall-wall" /><i className="hall-door" />
-    <b>WIKI³</b><p>{project.title}</p><small>{project.goal || '저장된 프로젝트 목표를 확인하지 못했습니다.'}</small>
+    <b>WIKI³</b><p>관찰된 프로젝트 흐름</p><small>{flow.observedFlow}</small>
   </section>
 }
 
@@ -57,6 +57,49 @@ function SourcePreview({ document, onClose }) {
     <p>{document.excerpt || '표시할 요약이 없습니다.'}</p>
     <dl><div><dt>공개 경로</dt><dd><code>{document.source}</code></dd></div><div><dt>기록 유형</dt><dd>{document.knowledgeType}</dd></div></dl>
   </section>
+}
+
+function EvidenceLinks({ paths, documents, onOpen }) {
+  const byPath = new Map(documents.map(document => [document.source, document]))
+  return <div className="evidence-links">{paths.map(path => {
+    const document = byPath.get(path)
+    return document ? <button key={path} className="source-link" onClick={() => onOpen(document)}>{document.title}<small>{path}</small></button> : null
+  })}</div>
+}
+
+function FlowBoard({ flow, onClose }) {
+  const returnFocus = useRef(document.activeElement)
+  const dialogRef = useRef(null)
+  const [source, setSource] = useState(null)
+  const documents = useMemo(() => publicFlowDocuments(flow, snapshot.documents), [flow])
+  useEffect(() => {
+    const onKeyDown = event => {
+      if (event.key === 'Escape') { event.preventDefault(); source ? setSource(null) : onClose(); return }
+      if (event.key !== 'Tab') return
+      const controls = [...(dialogRef.current?.querySelectorAll('button:not([disabled])') || [])]
+      if (!controls.length) return
+      const first = controls[0]; const last = controls.at(-1)
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus() }
+      if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [onClose, source])
+  useEffect(() => () => returnFocus.current?.focus?.(), [])
+  const section = (title, values, render) => <section className="detail-section"><h3>{title}</h3>{values.length ? <div className="flow-list">{values.map((value, index) => <article key={`${title}-${index}`}><p>{render(value)}</p><EvidenceLinks paths={value.evidencePaths || []} documents={documents} onOpen={setSource} /></article>)}</div> : <p>판단할 기록이 부족합니다.</p>}</section>
+  return <div className="member-modal-backdrop" onMouseDown={event => { if (event.currentTarget === event.target) onClose() }}>
+    <section className="member-detail flow-board" ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="flow-title">
+      <header><div><small>OBSERVED FLOW · NOT A DECISION</small><h2 id="flow-title">현재 관찰된 흐름</h2><p>{flow.observedFlow}</p></div><button onClick={onClose} autoFocus>닫기</button></header>
+      {section('자주 등장하는 주제', flow.frequentTopics, value => `${value.topic} · ${value.occurrences}건`)}
+      {section('최근 새 방향', flow.recentDirections, value => `${value.direction}${value.updatedAt ? ` · ${value.updatedAt}` : ''}`)}
+      {section('공통 관점', flow.commonGround, value => `${value.topic} · 명시적 ${value.stance}`)}
+      {section('의견 차이', flow.differingViews, value => `${value.topic} · ${value.positions.map(position => position.label).join(' / ')}`)}
+      {section('지식 공백', flow.knowledgeGaps, value => value.question)}
+      {section('다음 조사 질문', flow.nextResearchQuestions, value => value.question)}
+      <section className="detail-section"><h3>공식 결정</h3><p>공식 결정은 이 요약에 포함되지 않습니다. 명시적으로 승인된 <code>decisions/</code> 기록만 공식 결정입니다.</p></section>
+      <SourcePreview document={source} onClose={() => setSource(null)} />
+    </section>
+  </div>
 }
 
 function MemberDetail({ member, repository, onClose }) {
@@ -101,14 +144,16 @@ function MemberDetail({ member, repository, onClose }) {
   </div>
 }
 
-function EmptyState() {
-  const analyzeCommand = "'{\"statement\":\"프로젝트 목표를 여기에 설명하세요.\"}' | node scripts/wiki-architect-cli.mjs --command analyze"
-  return <main className="empty-state"><section><small>CLI-FIRST WIKI ARCHITECT</small><h1>CLI에서 프로젝트를 시작하세요</h1><p>웹은 저장된 공개 Wiki snapshot만 읽습니다. 프로젝트 생성과 인터뷰는 CLI에서 진행합니다.</p><code>{analyzeCommand}</code></section></main>
+function EmptyState({ flow }) {
+  const analyzeCommand = "'{\"statement\":\"첫 Wiki 기록: 해결하고 싶은 문제와 떠오른 생각을 적습니다.\"}' | node scripts/wiki-architect-cli.mjs --command analyze"
+  const insufficient = flow?.status === 'insufficient' && flow.evidencePaths?.length
+  return <main className="empty-state"><section><small>CLI-FIRST PUBLIC WIKI</small><h1>{insufficient ? '공개 Wiki 기록은 있으나 흐름을 판단할 근거가 부족합니다.' : '아직 흐름을 판단할 공개 Wiki 기록이 없습니다.'}</h1><p>{insufficient ? '기록 부재나 관점 차이를 추정하지 않습니다. 추가 기록이 쌓이면 다음 snapshot에서 다시 관찰합니다.' : 'CLI에서 첫 기록 과정을 시작하세요. 아이디어, 조사, 문제의식, 실험 기록 어느 것이든 시작점이 될 수 있습니다.'}</p><code>{analyzeCommand}</code></section></main>
 }
 
 function App() {
   const [repository, setRepository] = useState(null)
   const [selectedId, setSelectedId] = useState(null)
+  const [flowOpen, setFlowOpen] = useState(false)
   const [refreshStatus, setRefreshStatus] = useState('')
   const [isRefreshing, setIsRefreshing] = useState(false)
   const refreshInFlight = useRef(false)
@@ -128,15 +173,15 @@ function App() {
     } finally { refreshInFlight.current = false; setIsRefreshing(false) }
   }
 
-  if (!canRenderVillage(snapshot)) return <EmptyState />
+  if (!canRenderVillage(snapshot)) return <EmptyState flow={snapshot.flow} />
   return <main className="village-app">
-    <header className="village-header"><div><small>READ-ONLY VILLAGE</small><strong>{snapshot.projectContext.title}</strong></div><button onClick={refreshRepository} disabled={isRefreshing}>{isRefreshing ? '상태 확인 중…' : '저장소 상태 새로고침'}</button></header>
+    <header className="village-header"><div><small>READ-ONLY OBSERVATION</small><strong>관찰된 프로젝트 흐름</strong><span>{snapshot.flow.observedFlow}</span><em>근거 {snapshot.flow.evidencePaths.length}건 · 마지막 기록 {snapshot.flow.lastUpdatedAt || '확인 불가'}</em></div><div className="header-actions"><button onClick={() => setFlowOpen(true)}>흐름 자세히</button><button onClick={refreshRepository} disabled={isRefreshing}>{isRefreshing ? '상태 확인 중…' : '저장소 상태 새로고침'}</button></div></header>
     <p className="refresh-status" role="status" aria-live="polite">{refreshStatus}</p>
-    <section className="village-map" aria-label="저장된 Knowledge Guild 마을"><VillageScenery /><GuildHall project={snapshot.projectContext} />
-      {snapshot.projectState === 'PROJECT_READY' && <p className="member-empty">저장된 프로젝트입니다. member scaffold는 CLI에서 완성하세요.</p>}
-      {snapshot.projectState === 'VILLAGE_READY' && (snapshot.members || []).map((member, index) => <MemberHome key={member.id} member={member} index={index} repository={repository} onSelect={() => setSelectedId(member.id)} />)}
+    <section className="village-map" aria-label="저장된 Knowledge Guild 마을"><VillageScenery /><GuildHall flow={snapshot.flow} />
+      {(snapshot.members || []).map((member, index) => <MemberHome key={member.id} member={member} index={index} repository={repository} onSelect={() => setSelectedId(member.id)} />)}
     </section>
     {selectedMember && <MemberDetail member={selectedMember} repository={repository} onClose={() => setSelectedId(null)} />}
+    {flowOpen && <FlowBoard flow={snapshot.flow} onClose={() => setFlowOpen(false)} />}
   </main>
 }
 

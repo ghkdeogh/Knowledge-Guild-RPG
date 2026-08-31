@@ -24,7 +24,7 @@ expect(repositoryPathState('atlas', repository).id === 'remote-news' && reposito
 expect(repositoryPathState('lumi', repository).id === 'local-dirty' && repositoryPathState('lumi', repository).pose === 'crafting', 'Dirty public Wiki metadata did not control the member pose')
 expect(repositoryPathState('unknown', repository).id === 'unknown', 'Unknown member was assigned repository metadata')
 
-expect(snapshot.projectState === 'PROJECT_UNINITIALIZED' && snapshot.members.length === 0 && !/example-member/.test(JSON.stringify(snapshot)), 'Initial snapshot is not an example-free uninitialized guild')
+expect(snapshot.projectState === 'FLOW_UNINITIALIZED' && snapshot.flow?.status === 'insufficient' && snapshot.members.length === 0 && !/example-member/.test(JSON.stringify(snapshot)), 'Initial snapshot is not an example-free insufficient-flow guild')
 expect(snapshot.documents.every(document => document.scope !== 'personal' || (document.memberId && document.source.startsWith(`members/${document.memberId}/wiki/`))), 'Snapshot contains an unsafe personal document')
 expect((snapshot.skills || []).every(skill => !Object.hasOwn(skill, 'body') && ['project', 'member'].includes(skill.scope)), 'Snapshot exposes skill body content or an invalid scope')
 
@@ -35,5 +35,5 @@ expect(app.includes('PixelAvatar') && app.includes('memberHomePosition') && app.
 expect(app.includes('publicMemberDocuments') && app.includes('publicMemberSkills') && app.includes('memberPublicChanges') && app.includes('memberActivity(member, repository)'), 'Member detail can cross member or scope boundaries or ignore refreshed activity')
 expect(app.includes('purpose: {skill.purpose}') && app.includes('allowedScope: {skill.allowedScope}') && app.includes('readiness: {skill.readiness}'), 'Skill detail exposes more or less than safe metadata')
 expect(css.includes('.villager-sprite') && css.includes('.pixel-house') && css.includes('.status-bubble') && css.includes('.source-link'), 'Pixel village, status bubble, or source styling is missing')
-expect(snapshotBuilder.includes('publicMemberPaths') && snapshotBuilder.includes('`members/${memberId}/wiki`') && !snapshotBuilder.includes("'--', `members/${memberId}`"), 'Snapshot activity log can include private member-root changes')
+expect(snapshotBuilder.includes("`members/${memberId}/wiki`") && !snapshotBuilder.includes("'--', `members/${memberId}`"), 'Snapshot activity log can include private member-root changes')
 console.log(`Validated ${snapshot.members.length} guild residents, public activity copy, safe member detail allowlists, and no-example snapshot.`)

@@ -1,16 +1,27 @@
 {
-  "version": 6,
-  "projectState": "PROJECT_UNINITIALIZED",
-  "generatedAt": "onboarding-state",
-  "boundary": "WIKI SNAPSHOT · compiled wiki records only · no raw/output/private/secrets",
-  "decisionState": "Official decisions are represented only by decisions/ documents.",
+  "version": 7,
+  "projectState": "FLOW_UNINITIALIZED",
+  "generatedAt": null,
+  "boundary": "WIKI SNAPSHOT · projects/wiki and members/<id>/wiki only · no context/raw/output/private/secrets",
+  "decisionState": "Official decisions exist only in decisions/ after explicit approval; flow is an observation, not a decision.",
   "manifest": {
     "version": 1,
     "recordCount": 0,
     "contentDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
   },
-  "projectContext": null,
+  "flow": {
+    "version": 1,
+    "status": "insufficient",
+    "observedFlow": "아직 흐름을 판단할 공개 Wiki 기록이 없습니다.",
+    "frequentTopics": [],
+    "recentDirections": [],
+    "commonGround": [],
+    "differingViews": [],
+    "knowledgeGaps": [],
+    "nextResearchQuestions": [],
+    "evidencePaths": [],
+    "lastUpdatedAt": null
+  },
   "members": [],
-  "skills": [],
   "documents": []
 }

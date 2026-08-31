@@ -20,7 +20,7 @@ CLI로 프로젝트 Wiki를 설계·승인·생성하고, 저장된 공개 상�
 
 ## 이 프로젝트가 무엇인가
 
-Knowledge Guild RPG는 짧은 자유 입력을 바탕으로 프로젝트에 맞는 Wiki 구조를 제안하고, 승인 뒤에만 로컬 Markdown 파일을 만드는 **Wiki Architect**입니다. 사용자-facing 생성 경로는 JSONL CLI이며, 픽셀 마을은 safe snapshot과 공개 Git 경로 metadata를 읽기 전용으로 보여 줍니다.
+Knowledge Guild RPG는 짧은 자유 입력을 바탕으로 Wiki 구조를 제안하고, 승인 뒤에만 로컬 Markdown 파일을 만드는 **Wiki Architect**입니다. 사용자-facing 생성 경로는 JSONL CLI이며, 픽셀 마을은 safe snapshot과 공개 Git 경로 metadata를 읽기 전용으로 보여 줍니다. 프로젝트의 방향은 미리 입력한 목표가 아니라 공개 Wiki 기록이 쌓이며 드러나는 관찰 결과입니다.
 
 ## 핵심 그림
 
@@ -45,7 +45,7 @@ React pixel UI projection
 - 승인 전에는 파일을 쓰지 않고, 승인 뒤에는 local writable mode에서 안전한 경로만 원자적으로 생성합니다.
 - `raw/`(원본), 컴파일된 `wiki/`, `output/`(결과물), index/log를 분리한 구조를 만듭니다.
 - 프로젝트 공통 기록 또는 한 멤버의 허용된 Wiki 기록에 질문하고, 인용·신뢰도·한계·모드를 함께 확인합니다.
-- 픽셀 마을에서 저장된 프로젝트 길드홀과 멤버별 공개 Wiki 상태를 봅니다. 캐릭터 상세에서는 해당 member의 allowlisted 출처 요약과 스킬 metadata만 확인합니다.
+- 픽셀 마을에서 공개 Wiki 근거로 생성한 현재 관찰 흐름, 근거 수, 최근 기록과 멤버별 공개 Wiki 상태를 봅니다. 상세 보드에서는 공통 관점·명시적 의견 차이·지식 공백·다음 조사 질문과 allowlisted 출처만 확인합니다.
 - repository status와 길드 연출은 허용된 공개 Wiki path의 상태를 표현할 뿐, 실제 사람의 활동·의도·가용성을 뜻하지 않습니다.
 
 ## 3분 시작하기
@@ -77,26 +77,26 @@ node scripts/release-quickstart.mjs --target <new-absolute-directory-outside-thi
 
 `--target`은 parent가 이미 존재하는 **아직 존재하지 않는 저장소 밖 절대 경로**여야 합니다. 상대 경로, 현재 checkout 안의 경로(또는 그곳으로 향하는 symlink/junction), 이미 존재하는 경로는 fail-closed로 거부됩니다.
 
-## 첫 Wiki 만들기
+## 첫 Wiki 기록 남기기
 
-웹에서 유효 프로젝트가 없으면 프로젝트 건물이나 예제 member 없이 아래 CLI 시작 명령만 보입니다. `analyze` 뒤에는 실제 blueprint로 `preview`를 확인하고, digest를 넣은 `save`를 승인해 실행하세요. 승인 뒤에만 `projects/`와 해당 `members/{member-id}/`에 scaffold가 생성되며, 다음 snapshot build에서 프로젝트 길드홀과 member가 마을에 투영됩니다.
+웹에서 공개 기록이 없으면 건물이나 예제 member 없이 아래 CLI 시작 명령만 보입니다. 첫 입력은 아이디어, 조사, 문제의식, 실험 기록 또는 자유 프로젝트 메모 어느 것이든 됩니다. `analyze` 뒤에는 실제 blueprint로 `preview`를 확인하고, digest를 넣은 `save`를 승인해 실행하세요. 승인 뒤에만 scaffold가 생성되며, 공개 Wiki 기록을 남긴 다음 snapshot build에서 관찰 흐름과 member가 마을에 투영됩니다.
 
 ## CLI 사용법
 
 CLI도 화면과 같은 core를 사용합니다. 아래 명령은 `apps/wiki-village` 폴더에서 실행합니다. 모든 출력은 자동화에 쓰기 쉬운 JSONL(한 줄에 JSON 하나)입니다.
 
-### analyze — 자유 입력 해석
+### analyze — 첫 Wiki 기록 또는 자유 메모 해석
 
 PowerShell:
 
 ```powershell
-'{"statement":"동네 카페의 고객 피드백을 모아 메뉴 개선 가설을 검증하고 싶다."}' | node scripts/wiki-architect-cli.mjs --command analyze
+'{"statement":"첫 Wiki 기록: 고객 피드백을 관찰하며 떠오른 메뉴 개선 가설을 적는다."}' | node scripts/wiki-architect-cli.mjs --command analyze
 ```
 
 macOS/Linux 등의 일반 shell:
 
 ```sh
-printf '%s\n' '{"statement":"동네 카페의 고객 피드백을 모아 메뉴 개선 가설을 검증하고 싶다."}' | node scripts/wiki-architect-cli.mjs --command analyze
+printf '%s\n' '{"statement":"첫 Wiki 기록: 고객 피드백을 관찰하며 떠오른 메뉴 개선 가설을 적는다."}' | node scripts/wiki-architect-cli.mjs --command analyze
 ```
 
 PowerShell은 작은따옴표 안의 JSON을 그대로 전달할 수 있고, 일반 shell은 `printf`를 쓰면 줄바꿈을 명확히 보낼 수 있습니다. 결과의 `result.blueprint`를 다음 요청의 `blueprint`에 사용하세요.
@@ -106,7 +106,7 @@ PowerShell은 작은따옴표 안의 JSON을 그대로 전달할 수 있고, 일
 아래는 방금 `analyze`한 실제 blueprint를 `preview.json`으로 만들고, 쓰지 않을 파일 계획을 보는 PowerShell 예시입니다. `memberId`와 표시 이름은 본인이 확인한 값으로 바꾸세요.
 
 ```powershell
-$events = '{"statement":"동네 카페의 고객 피드백을 모아 메뉴 개선 가설을 검증하고 싶다."}' |
+$events = '{"statement":"첫 Wiki 기록: 고객 피드백을 관찰하며 떠오른 메뉴 개선 가설을 적는다."}' |
   node scripts/wiki-architect-cli.mjs --command analyze |
   ForEach-Object { $_ | ConvertFrom-Json }
 $blueprint = ($events | Where-Object { $_.type -eq 'result' }).result.blueprint
@@ -167,13 +167,15 @@ members/<member-id>/
 
 ## 캐릭터와 길드 UI가 뜻하는 것
 
-중앙 **프로젝트 길드홀**은 `projects/`의 공통 맥락만 나타냅니다. 각 **캐릭터와 집**은 오직 해당 `members/{member-id}/wiki/**`의 공개 개인 Wiki 범위만 나타냅니다. `CONTEXT.md`와 `WIKI_SCHEMA.md`는 멤버를 식별·검증하는 로컬 설정이며 snapshot, evidence, citation source가 아닙니다. 개인 관점은 자동으로 공통 사실이나 공식 결정이 되지 않습니다.
+중앙 **프로젝트 길드홀**은 `projects/wiki/**`와 `members/{member-id}/wiki/**`의 공개 기록에서 도출한 현재 관찰 흐름만 나타냅니다. 각 **캐릭터와 집**은 오직 해당 `members/{member-id}/wiki/**`의 공개 개인 Wiki 범위만 나타냅니다. `CONTEXT.md`와 `WIKI_SCHEMA.md`는 로컬 설정이며 snapshot, evidence, citation source가 아닙니다. 개인 관점은 자동으로 공통 사실·팀 합의·공식 결정이 되지 않습니다.
+
+관찰 흐름은 규칙 기반 fallback으로도 생성되며 공식 목표나 결정이 아닙니다. `decisions/`에 명시적으로 승인된 내용만 공식 결정입니다. 기록이 없거나 주제가 충분하지 않으면 UI는 `판단할 기록이 부족합니다`라고 표시하며, 기록 부재를 동의·반대로 해석하지 않습니다. `npm run snapshot`(또는 build)이 flow snapshot을 갱신하고, UI의 **저장소 상태 새로고침**은 공개 Git 경로 metadata만 수동 확인할 뿐 snapshot을 다시 만들지 않습니다.
 
 캐릭터의 포즈와 말풍선은 public snapshot의 마지막 경로 변경일 또는 사용자가 갱신한 공개 Git path metadata만 읽는 중립 visual state입니다. 실제 사람의 상태, 의도, 온라인 여부, 가용성을 주장하지 않습니다.
 
 ## 보안과 데이터 경계
 
-- 공개 snapshot·evidence·citation 대상은 승인된 project Wiki와 `members/{member-id}/wiki/**`뿐입니다. member의 `CONTEXT.md`, `WIKI_SCHEMA.md`, `raw/`, `output/`, private profile/context, secrets는 그 대상이 아닙니다.
+- 공개 snapshot·evidence·citation 대상은 `projects/wiki/**`와 `members/{member-id}/wiki/**`뿐입니다. `PROJECT_CONTEXT.md`, `WIKI_BLUEPRINT.md`, member의 `CONTEXT.md`, `WIKI_SCHEMA.md`, `raw/`, `output/`, private profile/context, secrets는 그 대상이 아닙니다.
 - `.env`, API 키, project/member raw·output·private·secrets는 커밋하지 않습니다. `.gitignore`는 이 로컬 경계를 보호합니다.
 - 사용자의 원문, AI 제안, 승인된 blueprint를 구분합니다. 승인 전에는 canonical 파일을 만들지 않습니다.
 - CLI의 local writable mode만 실제 repository 쓰기를 수행합니다. Vercel 같은 read-only 배포는 preview/export 화면일 뿐, 저장됐다고 말하지 않습니다.
