@@ -33,7 +33,7 @@ try {
   const link = join(linkParent, 'workspace-link'); await symlink(appRoot, link, process.platform === 'win32' ? 'junction' : 'dir'); await runCli(['--target', join(link, 'escaped-sample')]).then(() => { throw new Error('Symlinked workspace target was accepted') }, error => expect(error.stderr.includes('release-target-workspace'), 'Symlinked workspace target failed with the wrong safety code'))
   const failedTarget = join(parent, 'failed-sample')
   await createReleaseQuickstart({ target: failedTarget, run: async (command, payload, options) => {
-    if (command !== 'save') return runWikiArchitect(command, payload, options)
+    if (command !== 'save-workspace') return runWikiArchitect(command, payload, options)
     await mkdir(join(options.repoRoot, 'projects'), { recursive: true })
     await writeFile(join(options.repoRoot, 'projects', 'partial.md'), 'partial')
     throw Object.assign(new Error('forced save failure'), { code: 'forced-save-failure' })

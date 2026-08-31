@@ -10,7 +10,7 @@ Create a project with the JSONL CLI, not the browser:
 '{"statement":"첫 Wiki 기록: 기술 실험에서 관찰한 점을 적는다."}' | node scripts/wiki-architect-cli.mjs --command analyze
 ```
 
-Use `preview` with the returned blueprint, then submit the approved digest to `save`. `npm run build` safely rebuilds the snapshot before creating the production bundle.
+Use `preview` with the returned blueprint, then submit the approved digest to `save`. That default CLI flow creates only the requested member's personal Wiki; the browser remains read-only. Use `preview-workspace` and `save-workspace` only when an explicit project-and-member scaffold is needed. `npm run build` safely rebuilds the snapshot before creating the production bundle.
 
 ## Village states
 

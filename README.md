@@ -79,7 +79,7 @@ node scripts/release-quickstart.mjs --target <new-absolute-directory-outside-thi
 
 ## 첫 Wiki 기록 남기기
 
-웹에서 공개 기록이 없으면 건물이나 예제 member 없이 아래 CLI 시작 명령만 보입니다. 첫 입력은 아이디어, 조사, 문제의식, 실험 기록 또는 자유 프로젝트 메모 어느 것이든 됩니다. `analyze` 뒤에는 실제 blueprint로 `preview`를 확인하고, digest를 넣은 `save`를 승인해 실행하세요. 승인 뒤에만 scaffold가 생성되며, 공개 Wiki 기록을 남긴 다음 snapshot build에서 관찰 흐름과 member가 마을에 투영됩니다.
+웹에서 공개 기록이 없으면 건물이나 예제 member 없이 아래 CLI 시작 명령만 보입니다. 첫 입력은 아이디어, 조사, 문제의식, 실험 기록 또는 자유 프로젝트 메모 어느 것이든 됩니다. `analyze` 뒤에는 실제 blueprint로 `preview`를 확인하고, digest를 넣은 `save`를 승인해 실행하세요. 기본 경로는 요청한 member의 개인 Wiki만 만듭니다. 공개 개인 Wiki 기록을 남긴 다음 snapshot build에서 관찰 흐름과 member가 마을에 투영됩니다.
 
 ## CLI 사용법
 
@@ -132,7 +132,11 @@ $localRoot = Join-Path $HOME 'knowledge-guild-cli-demo'
 node scripts/wiki-architect-cli.mjs --command save --repo-root $localRoot --input .\save.json
 ```
 
-digest가 다르거나 기존 파일과 충돌하면 저장하지 않습니다. 경로 이동(`..`), 예약된 private/secrets 경로, 허용하지 않은 경로도 거부합니다.
+digest가 다르거나 기존 member root와 충돌하면 저장하지 않습니다. 기본 저장은 기존 `projects/`가 있어도 project 파일을 만들거나 바꾸지 않습니다. 경로 이동(`..`), 예약된 private/secrets 경로, 허용하지 않은 경로도 거부합니다.
+
+### Advanced: workspace scaffold — project와 member를 함께 명시적으로 만들기
+
+공통 project scaffold가 실제로 필요할 때만 `preview-workspace`와 같은 digest로 `save-workspace`를 사용하세요. 두 명령은 project와 member 계획을 함께 보여 주며, 저장 중 오류가 나면 둘 다 롤백합니다. 기본 `preview`/`save`의 digest는 workspace 명령에 사용할 수 없습니다.
 
 ### status — 현재 scaffold 상태 확인
 
@@ -149,18 +153,18 @@ printf '%s\n' '{}' | node scripts/wiki-architect-cli.mjs --command status
 모든 프로젝트에 똑같은 지식 분류를 강요하지 않습니다. 공통 골격만 안전하게 유지하고, blueprint가 목적에 맞는 page type과 routing을 정합니다.
 
 ```text
-projects/
-  PROJECT_CONTEXT.md       # 승인된 공통 brief
-  WIKI_BLUEPRINT.md        # 왜 이 구조인지, page type/routing/harness
-  index/ · log/            # 공통 색인과 기록
-members/<member-id>/
+members/<member-id>/       # 기본 preview/save가 만드는 personal-only scaffold
   CONTEXT.md               # 로컬 최소 identity/context; public snapshot·evidence·citation 대상 아님
   WIKI_SCHEMA.md           # 로컬 schema 설정; public snapshot·evidence·citation 대상 아님
-  raw/                     # 불변 원본을 둘 계층
-  wiki/                    # AI가 컴파일해 유지할 공개 개인 Wiki 계층
-  output/                  # Wiki에서 만든 별도 결과물
-  index/ · log/            # 멤버 범위 색인과 기록
+  WIKI_INDEX.md · ACTIVITY_LOG.md
+  wiki/                    # 공개 개인 Wiki 계층과 첫 public index
   harnesses/               # 선택된 ingest/query/lint/reflect SKILL.md scaffold
+
+projects/                  # explicit preview-workspace/save-workspace에서만 생성
+  PROJECT_CONTEXT.md       # 승인된 공통 brief
+  WIKI_BLUEPRINT.md        # 왜 이 구조인지, page type/routing/harness
+  raw/ · wiki/ · output/ · harnesses/
+  WIKI_INDEX.md · ACTIVITY_LOG.md
 ```
 
 예를 들어 기술 학습은 `기술 / 판단 / 레시피 / 사례`, 시장 조사는 `기업 / 시장 / 가설 / 신호 / 결론`, 창작은 `세계관 / 캐릭터 / 플롯 / 자료 / 산출물`처럼 달라질 수 있습니다. 이는 예시일 뿐이며, 실제 page type은 프로젝트 입력과 승인한 blueprint가 결정합니다.

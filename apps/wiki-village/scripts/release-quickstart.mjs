@@ -42,8 +42,8 @@ export async function createReleaseQuickstart({ target, temporary = false, run =
     const analyzed = await run('analyze', { statement: '학습 팀이 기술 실험을 정리하고 반복 가능한 교육 결과를 만들고 싶다.' }, { repoRoot: root, providerConfig: {} })
     const identity = { memberId: 'sample-author', displayName: 'Sample Author', workingContext: '승인된 샘플 Wiki 구조를 검토합니다.' }
     if (analyzed.result.mode !== 'local-draft' || analyzed.result.providerStatus !== 'not-configured') throw fail('The release quickstart must use the credential-free local draft.', 'release-provider-configured')
-    const previewed = await run('preview', { blueprint: analyzed.result.blueprint, identity }, { repoRoot: root })
-    const saved = await run('save', { blueprint: analyzed.result.blueprint, identity, expectedDigest: previewed.result.preview.digest }, { repoRoot: root, refresh: false })
+    const previewed = await run('preview-workspace', { blueprint: analyzed.result.blueprint, identity }, { repoRoot: root })
+    const saved = await run('save-workspace', { blueprint: analyzed.result.blueprint, identity, expectedDigest: previewed.result.preview.digest }, { repoRoot: root, refresh: false })
     const required = ['projects/PROJECT_CONTEXT.md', 'projects/WIKI_BLUEPRINT.md', 'projects/harnesses/query.SKILL.md', 'members/sample-author/CONTEXT.md', 'members/sample-author/WIKI_SCHEMA.md', 'members/sample-author/wiki/index.md', 'members/sample-author/harnesses/query.SKILL.md']
     await Promise.all(required.map(path => access(join(root, path))))
     if (saved.result.state.phase !== 'VILLAGE_READY') throw fail('The release quickstart did not create a ready village scaffold.', 'release-scaffold-invalid')

@@ -106,7 +106,7 @@ const analysisSchema = {
 }
 const diagnostic = (category, message) => ({ category, message })
 const providerFailure = error => {
-  if (error instanceof SyntaxError || error?.code === 'invalid-input' || error?.code === 'invalid-blueprint' || error?.code === 'unsafe-path') return diagnostic('malformed-response', 'AI 응답 형식을 검증하지 못해 로컬 초안을 제안합니다.')
+  if (error instanceof SyntaxError || error?.name === 'SyntaxError' || error?.code === 'invalid-input' || error?.code === 'invalid-blueprint' || error?.code === 'unsafe-path') return diagnostic('malformed-response', 'AI 응답 형식을 검증하지 못해 로컬 초안을 제안합니다.')
   if (error?.name === 'AbortError' || /network|fetch|timeout|etimedout|econn|enotfound/i.test(String(error?.code || error?.message || ''))) return diagnostic('unavailable', 'AI 제공자에 연결할 수 없어 로컬 초안을 제안합니다.')
   return diagnostic('failed', 'AI 제안을 사용할 수 없어 로컬 초안을 제안합니다.')
 }
@@ -114,8 +114,7 @@ export async function analyzeProject({ statement, clarifications = [] }, { respo
   const fallback = localDraft(statement, clarifications)
   if (!providerConfig.apiKey && !responsesClient) return { ...fallback, providerStatus: 'not-configured', diagnostic: diagnostic('not-configured', 'AI 제공자가 설정되지 않아 로컬 초안을 제안합니다.') }
   try {
-    const OpenAI = (await import('openai')).default
-    const client = responsesClient || new OpenAI({ apiKey: providerConfig.apiKey })
+    const client = responsesClient || new (await import('openai')).default({ apiKey: providerConfig.apiKey })
     const response = await client.responses.create({ model: providerConfig.model || 'gpt-5.6-terra', store: false, ...(providerConfig.reasoningEffort ? { reasoning: { effort: providerConfig.reasoningEffort } } : {}), instructions: 'Interpret a project statement without repeating it. Return only a Korean JSON proposal. Distinguish known facts, assumptions, and unknowns. Propose project-specific page type ids as lowercase hyphenated identifiers matching ^[a-z][a-z0-9-]{1,32}$; do not use raw, output, private, secrets, .env, node_modules, .obsidian, or reserved Windows names. Routes are server-rendered, so do not return paths. Never provide source content or arbitrary paths.', input: 'Create an editable project Wiki blueprint from this user statement and optional clarification answers. Do not quote or reproduce either.\nStatement: ' + clean(statement, 1200) + '\nClarifications: ' + clarifications.map(item => clean(item, 500)).filter(Boolean).join(' | '), text: { format: { type: 'json_schema', name: 'project_wiki_architect', strict: true, schema: analysisSchema } } }, typeof AbortSignal?.timeout === 'function' ? { signal: AbortSignal.timeout(30000) } : undefined)
     const outputText = typeof response.output_text === 'string' ? response.output_text : response.output?.flatMap(item => item.content || []).map(item => item.text || item.value || '').find(Boolean)
     if (response.status && response.status !== 'completed') throw Object.assign(new Error('Provider response incomplete'), { code: 'provider-incomplete' })
@@ -157,18 +156,14 @@ export function renderProjectFiles(blueprint) {
 export function renderMemberFiles(identity, blueprint) {
   const safeIdentity = validateIdentity(identity); const safe = sanitizeBlueprint(blueprint)
   const metadata = `schema: ${architectSchema}\nmemberId: ${safeIdentity.memberId}\nknowledgeType: personal-opinion\n`
+  const personalBlueprint = JSON.stringify({ pageTypes: safe.pageTypes, sourceCategories: safe.sourceCategories, outputTypes: safe.outputTypes, harnesses: safe.harnesses, rationale: safe.rationale }, null, 2)
   const files = {
     'CONTEXT.md': `---\n${metadata}---\n\n# Member Context\n\n## Display name\n\n${safeIdentity.displayName}\n\n## Approved working context\n\n${safeIdentity.workingContext}\n`,
-    'WIKI_SCHEMA.md': `---\nschema: ${architectSchema}\nmemberId: ${safeIdentity.memberId}\nknowledgeType: wiki-record\n---\n\n# Personal Wiki Schema\n\n개인 의견은 personal-opinion으로, 공통 사실은 projects/에 분리합니다.\n`,
-    'raw/README.md': '# Raw source layer\n\n명시적 ingest 승인 전에는 사용자 원문을 저장하지 않습니다.\n',
-    'wiki/index.md': `---\nschema: ${architectSchema}\nmemberId: ${safeIdentity.memberId}\nknowledgeType: personal-opinion\n---\n\n# ${safeIdentity.displayName} Wiki\n\n## Working context\n\n${safeIdentity.workingContext}\n`,
-    'output/README.md': '# Output layer\n\n개인 Wiki의 결과물은 compiled records와 분리합니다.\n',
-    'WIKI_INDEX.md': '# Personal Wiki index\n\n' + safe.pageTypes.map(item => `- ${item.label}`).join('\n') + '\n',
+    'WIKI_SCHEMA.md': `---\nschema: ${architectSchema}\nmemberId: ${safeIdentity.memberId}\nknowledgeType: wiki-record\n---\n\n# Personal Wiki Schema\n\n개인 의견은 personal-opinion으로, 공통 사실은 projects/에 분리합니다.\n\n## Approved blueprint\n\n\`\`\`json\n${personalBlueprint}\n\`\`\`\n`,
+    'wiki/index.md': `---\nschema: ${architectSchema}\nmemberId: ${safeIdentity.memberId}\nknowledgeType: personal-opinion\n---\n\n# ${safeIdentity.displayName} Wiki\n\n승인된 개인 Wiki의 공개 index입니다. 첫 기록은 아래 page type 중 하나에 명시적 승인으로 추가합니다.\n`,
+    'WIKI_INDEX.md': `---\nschema: ${architectSchema}\nmemberId: ${safeIdentity.memberId}\nknowledgeType: personal-opinion\n---\n\n# Personal Wiki index\n\n` + safe.pageTypes.map(item => `- [${item.label}](${item.route}) — ${item.reason}`).join('\n') + '\n',
     'ACTIVITY_LOG.md': '# Activity log\n\n- Personal Wiki scaffold created after explicit approval.\n',
   }
-  for (const item of safe.sourceCategories) files[`raw/${item.id}/README.md`] = `# ${item.label} source category\n\n${item.reason}\n\n원문은 명시적 ingest 승인 뒤에만 이 member scope에 둡니다.\n`
-  for (const item of safe.outputTypes) files[`output/${item.id}/README.md`] = `# ${item.label} output type\n\n${item.reason}\n\n결과물은 member compiled Wiki와 분리합니다.\n`
-  for (const item of safe.pageTypes) files[`wiki/${item.id}/index.md`] = `---\nschema: ${blueprintSchema}\nmemberId: ${safeIdentity.memberId}\nknowledgeType: ${item.id === 'hypothesis' ? 'hypothesis' : 'wiki-record'}\npageType: ${item.id}\n---\n\n# ${item.label}\n\n## Approved working context\n\n${safeIdentity.workingContext}\n`
   for (const harness of safe.harnesses) files[`harnesses/${harness}.SKILL.md`] = renderHarness(harness, safe)
   return files
 }
