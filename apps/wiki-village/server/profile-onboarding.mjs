@@ -84,16 +84,18 @@ const localTopicInterpretation = (question, answer, seed) => {
 }
 const evidenceItemSchema = { type: 'object', additionalProperties: false, required: ['value', 'evidence'], properties: { value: { type: 'string' }, evidence: { type: 'string' } } }
 const topicSchema = { type: 'object', additionalProperties: false, required: ['roles', 'strengths', 'values', 'gaps', 'vision', 'audiences', 'formats', 'oneYearState', 'aiExpectations', 'workRules'], properties: Object.fromEntries(Object.values(providerFields).flat().map(key => [key, { type: 'array', items: evidenceItemSchema }])) }
-const normalized = value => clean(value, 4000).replace(/\s+/g, ' ')
+const normalized = value => clean(value, 4000).normalize('NFKC').replace(/\s+/g, ' ')
+const comparable = value => normalized(value).toLocaleLowerCase()
+const genericLabelTokens = new Set(['역할', '중심', '독자', '형식', '상태', '지원', '규칙', '목표'])
+const sharesConcept = (value, evidence) => (value.toLowerCase().match(/[a-z]{3,}|[가-힣]{2,}/g) || []).filter(token => !genericLabelTokens.has(token)).some(token => evidence.toLowerCase().includes(token))
+const leaksSourceIdentifier = (value, source) => (comparable(value).match(/[a-z0-9_-]{4,}/g) || []).some(token => comparable(source).includes(token))
 const evidenceBacked = (item, source) => {
   const value = clean(item?.value, 64)
   const evidence = clean(item?.evidence, 160)
   const normalizedValue = normalized(value); const normalizedEvidence = normalized(evidence)
   if (!normalizedValue || !normalizedEvidence || normalizedEvidence.length < 4 || !source.includes(normalizedEvidence)) return ''
-  if (!normalizedEvidence.includes(normalizedValue) && !normalizedValue.includes(normalizedEvidence)) return ''
-  if (normalizedEvidence === normalizedValue || normalizedEvidence.length <= normalizedValue.length + 1) return ''
+  if (comparable(source).includes(comparable(normalizedValue)) || leaksSourceIdentifier(normalizedValue, source) || !sharesConcept(normalizedValue, normalizedEvidence)) return ''
   if (/[\r\n.!?]/.test(value) || normalizedValue.length > 32) return ''
-  if (normalizedValue.length > 16 && source.includes(normalizedValue)) return ''
   return value
 }
 const sanitizedProviderTopic = (question, candidate, seed) => {
@@ -111,7 +113,7 @@ async function interpretTopic(question, answer, seed, options) {
     if (typeof options?.profileInterpreter === 'function') return sanitizedProviderTopic(question, { ...await options.profileInterpreter({ question: question.id, answer, seed: seed?.content || '' }), __answer: answer }, seed)
     if (!options?.responsesClient && !options?.providerConfig?.apiKey) return fallback
     const client = options.responsesClient || new (await import('openai')).default({ apiKey: options.providerConfig.apiKey })
-    const response = await client.responses.create({ model: options.providerConfig?.model || 'gpt-5.6-terra', store: false, ...(options.providerConfig?.reasoningEffort ? { reasoning: { effort: options.providerConfig.reasoningEffort } } : {}), instructions: 'Return only strict Korean JSON. For the current topic only, provide at most five generic structured items per allowed field. Every item needs a short normalized value and exact source evidence. Evidence is validation-only and will never be saved. Do not quote full sentences, do not put evidence in value, do not infer facts, and leave unsupported fields empty.', input: `Topic: ${question.topic}\nApproved private seed (bounded; provider consent obtained): ${seed?.content || '(none)'}\nCurrent answer (provider consent obtained): ${answer}`, text: { format: { type: 'json_schema', name: 'profile_topic_summary', strict: true, schema: topicSchema } } })
+    const response = await client.responses.create({ model: options.providerConfig?.model || 'gpt-5.6-terra', store: false, ...(options.providerConfig?.reasoningEffort ? { reasoning: { effort: options.providerConfig.reasoningEffort } } : {}), instructions: 'Return only strict Korean JSON. For the current topic only, provide at most five generic structured items per allowed field. Every item needs a concise normalized interpretation and exact source evidence. Evidence is validation-only and will never be saved. The value must not be a quote or any substring of the source; use a short category-style label grounded in the evidence instead. Do not infer facts, and leave unsupported fields empty.', input: `Topic: ${question.topic}\nApproved private seed (bounded; provider consent obtained): ${seed?.content || '(none)'}\nCurrent answer (provider consent obtained): ${answer}`, text: { format: { type: 'json_schema', name: 'profile_topic_summary', strict: true, schema: topicSchema } } })
     const output = typeof response.output_text === 'string' ? response.output_text : ''
     return sanitizedProviderTopic(question, { ...JSON.parse(output), __answer: answer }, seed)
   } catch { return fallback }
