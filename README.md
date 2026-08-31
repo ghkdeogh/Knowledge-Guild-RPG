@@ -83,7 +83,7 @@ node scripts/release-quickstart.mjs --target <new-absolute-directory-outside-thi
 
 ### 개인 프로필 온보딩
 
-개인 작업 맥락부터 정리하려면 `profile-onboarding-cli.mjs`를 사용합니다. 스트리밍 JSONL은 이름을 먼저 묻고, 공개 범위를 명시 확인한 뒤 `나는 누구인가 → 기록하려는 이유 → 원하는 결과물`의 세 질문만 한 번에 하나씩 진행합니다. 각 답변 뒤 요약과 다음 질문을 출력하며, 마지막에는 `PROFILE.md`와 provider-neutral `CONTEXT.md`의 preview/digest를 냅니다. `approve`와 별도 `save`가 모두 있어야만 선택한 `members/<member-id>/`에 저장됩니다. 기본 흐름은 `projects/`를 만들거나 바꾸지 않으며 `CLAUDE.md`도 생성하지 않습니다.
+개인 작업 맥락부터 정리하려면 “온보딩 시작해줘”라고 요청하거나 `profile-onboarding-cli.mjs`를 사용합니다. 스트리밍 JSONL은 이름을 먼저 묻고, 공개 범위를 명시 확인한 뒤 `나는 누구인가 → 기록하려는 이유 → 원하는 결과물`의 세 질문만 한 번에 하나씩 진행합니다. 한국어 이름처럼 바로 쓸 수 없는 이름 뒤에는 저장용 `member-id`를 별도로 확인합니다. 각 답변 뒤 구조화 요약과 다음 질문을 출력하며, 마지막에는 `PROFILE.md`와 provider-neutral `CONTEXT.md`의 preview/digest를 냅니다. 같은 실행 세션에서 출력된 digest로 `approve`와 별도 `save`를 모두 보내야 선택한 `members/<member-id>/`에 저장됩니다. 기본 흐름은 `projects/`를 만들거나 바꾸지 않으며 `CLAUDE.md`도 생성하지 않습니다.
 
 ## CLI 사용법
 

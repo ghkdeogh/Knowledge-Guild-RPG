@@ -12,15 +12,17 @@ Create a project with the JSONL CLI, not the browser:
 
 Use `preview` with the returned blueprint, then submit the approved digest to `save`. That default CLI flow creates only the requested member's personal Wiki; the browser remains read-only. Use `preview-workspace` and `save-workspace` only when an explicit project-and-member scaffold is needed. `npm run build` safely rebuilds the snapshot before creating the production bundle.
 
-For profile-first onboarding, use the streaming JSONL command. It asks for a name first, requires a public-scope confirmation, then asks exactly three questions one at a time. It only writes approved `PROFILE.md` and provider-neutral `CONTEXT.md` in the selected member scope after preview, digest approval, and a separate save request:
+For profile-first onboarding, say **“온보딩 시작해줘”** or use the streaming JSONL command. It asks for a name first; a Korean display name is then followed by a separate storage-id setup question. After public-scope confirmation it asks exactly three interview questions, one at a time. This is an interactive JSONL session: keep the process running, send the next JSON object only after reading its JSONL events, and use the digest emitted after the third topic in the final two requests. It only writes approved `PROFILE.md` and provider-neutral `CONTEXT.md` in the selected member scope:
 
 ```powershell
 @'
-{"action":"start","memberId":"my-member"}
+{"action":"start"}
 {"action":"answer","answer":"이름"}
 {"action":"privacy","approved":true}
 '@ | node scripts/profile-onboarding-cli.mjs
 ```
+
+Continue the same session with the three `{"action":"answer","answer":"..."}` topic replies. The third reply emits `approval.required` with `<digest>`; then send `{"action":"approve","expectedDigest":"<digest>"}` and `{"action":"save","expectedDigest":"<digest>"}`. A fresh process starts a fresh session, so do not use a one-shot pipe for the approval step. The credential-free `local-draft` interpreter is the default; when a configured external AI provider may receive interview answers, include `"providerApproved":true` only in the privacy confirmation after reviewing that transfer.
 
 ## Village states
 
