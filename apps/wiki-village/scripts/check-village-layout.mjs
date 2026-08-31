@@ -1,37 +1,38 @@
 import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { homeSpots, memberHomeIsClearOfPersistentUi, memberHomePosition } from '../src/village-layout.js'
+import { canRenderVillage, memberPublicChanges, publicMemberDocuments, publicMemberSkills } from '../src/village-view.js'
 
 const root = resolve(import.meta.dirname, '..')
-const css = await readFile(resolve(root, 'src/styles.css'), 'utf8')
-const app = await readFile(resolve(root, 'src/App.jsx'), 'utf8')
-const onboarding = await readFile(resolve(root, 'src/Onboarding.jsx'), 'utf8')
+const [app, css, vite] = await Promise.all([
+  readFile(resolve(root, 'src/App.jsx'), 'utf8'),
+  readFile(resolve(root, 'src/styles.css'), 'utf8'),
+  readFile(resolve(root, 'vite.config.js'), 'utf8'),
+])
+const expect = (value, message) => { if (!value) throw new Error(message) }
 
-if (!css.includes('html,body,#root{height:100%;margin:0;overflow:hidden}') || !css.includes('.village-map{') || !css.includes('height:100%')) throw new Error('Full-viewport village guard is missing')
-if (!app.includes('MemberHome') || !app.includes('snapshot.members.map') || !app.includes('getMemberDocuments')) throw new Error('Dynamic member home rendering is missing')
-if (!app.includes('HouseInterior') || !app.includes('role="dialog"') || !app.includes('Wiki 문서 서가')) throw new Error('Wiki house interior is missing')
-if (!app.includes('MissionBoard') || !app.includes('AnswerPanel') || !app.includes('Source scope') || !app.includes('ALLOWLISTED SOURCE')) throw new Error('Traceable Mission Board answer surface is missing')
-if (!app.includes('Onboarding') || !app.includes("onboardingState.phase !== 'VILLAGE_READY'") || !app.includes('PROJECT_UNINITIALIZED')) throw new Error('Onboarding state gate is missing')
-if (!onboarding.includes('PROJECT WIKI ARCHITECT') || !onboarding.includes('BlueprintFields') || !onboarding.includes('고급 JSON 편집기') || !onboarding.includes('identity-confirm') || onboarding.includes('PROJECT PROLOGUE')) throw new Error('Structured architect review flow is missing or fixed interview remains')
-if (!onboarding.includes('events.some') || !onboarding.includes('files.written')) throw new Error('Onboarding reward is not projected from application events')
-if (!app.includes("document.scope === target?.scope") || !app.includes('documentsById.get(item?.id)')) throw new Error('Client citation drawer does not re-check the safe snapshot scope')
-if (!css.includes('@media(max-width:800px)') || !css.includes('.room-content{display:block')) throw new Error('Responsive house interior guard is missing')
-if (!css.includes('.mission-board{') || !css.includes('.answer-panel{') || !css.includes('.source-drawer{')) throw new Error('Mission Board answer styling is missing')
-if (!css.includes('.onboarding-layer{') || !css.includes('.onboarding-card{') || !css.includes('@media(prefers-reduced-motion:no-preference)')) throw new Error('Accessible reduced-motion onboarding styling is missing')
-if (!app.includes('guild-prompt-dock') || !app.includes("/api/repository-status") || !app.includes('CharacterMenu') || !app.includes('SkillStation')) throw new Error('Guild prompt, repository projection, character menu, or skill station is missing')
-if (!app.includes('RepositoryBark') || !app.includes('RepositoryChanges') || !app.includes('confirmSeen') || app.includes('checkRepository().then(markSeen)')) throw new Error('Repository bark/change panel or explicit seen confirmation contract is missing')
-if (!app.includes('AnswerBubble') || !app.includes('GuildAnswerScroll') || !app.includes('onAnswerStart') || !app.includes('onAnswerResult')) throw new Error('Scoped answer bubble/scroll projection is missing')
-if (!app.includes('shouldHideRepositoryBark') || !app.includes('이 Wiki 기록에서는 답을 찾지 못했어요.') || !app.includes('지금은 답변을 가져오지 못했어요.')) throw new Error('Answer/repository priority or truthful unsupported/error copy is missing')
-if (!app.includes('Mission Board의 저장소 새 소식 확인을 사용하세요.') || !app.includes('role="status" aria-live="polite"')) throw new Error('Repository status UI does not distinguish unavailable checks or announce one bark')
-if (!app.includes('project-change-action') || !css.includes('.project-change-action')) throw new Error('Mobile project-only repository changes have no compact action')
-if (!app.includes("const memberId = member?.id || null") || !app.includes("'선택된 member 공개 Wiki 경로'")) throw new Error('Repository changes panel is not safe when its member record is unavailable')
-if (!app.includes('changesReturnFocus') || !app.includes('const closeChanges') || !app.includes('data-member-id')) throw new Error('Repository changes panel does not restore a stable triggering focus target')
-if (!app.includes('members/{member.id}/wiki/') || !app.includes('detail.readiness')) throw new Error('Scoped character action or non-executable skill disclosure is missing')
-if (!css.includes('.pose-crafting') || !css.includes('.pose-notice') || !css.includes('.guild-prompt-dock')) throw new Error('Repository pose or dock styles are missing')
-if (!css.includes('.repository-bark') || !css.includes('.answer-bubble') || !css.includes('.guild-answer-scroll') || !css.includes('@media(prefers-reduced-motion:no-preference)')) throw new Error('Repository/answer bubble or reduced-motion visual guard is missing')
+expect(app.includes('CLI에서 프로젝트를 시작하세요') && app.includes('--command analyze'), 'Empty snapshot does not show the minimal CLI analyze command')
+expect(app.includes('canRenderVillage(snapshot)'), 'Empty-state project guard is missing')
+expect(app.includes('GuildHall') && app.includes("snapshot.projectState === 'PROJECT_READY'") && app.includes('member scaffold는 CLI에서 완성하세요'), 'Project-only village guard is missing')
+expect(app.includes('MemberDetail') && app.includes('SourcePreview') && app.includes('스킬 metadata'), 'Read-only member detail or source preview is missing')
+expect(app.includes('publicMemberDocuments') && app.includes('publicMemberSkills') && app.includes('memberPublicChanges'), 'Member detail does not use the tested public-data boundary helpers')
+expect(app.includes("fetch('/api/repository-status', { method: 'POST' })") && app.includes('refreshInFlight.current') && app.includes('disabled={isRefreshing}') && app.includes('role="status" aria-live="polite"'), 'Serialized repository refresh or its status announcement is missing')
+expect(app.includes("snapshot.projectState === 'VILLAGE_READY' && (snapshot.members || []).map"), 'Members render outside the valid village-ready state')
+expect(app.includes('member-modal-backdrop') && app.includes('dialogRef.current?.querySelectorAll') && app.includes('closeSource()'), 'Member modal backdrop, focus trap, or source-focus restoration is missing')
+for (const retired of ['Onboarding', 'MissionBoard', 'AnswerPanel', 'AnswerBubble', 'GuildAnswerScroll', 'HouseInterior', '/api/wiki-chat', '/api/onboarding-state', '<input', '<textarea']) expect(!app.includes(retired), `Retired browser surface remains: ${retired}`)
+expect(!vite.includes('wiki-chat') && !vite.includes('onboarding') && vite.includes('repositoryStatusMiddleware'), 'Dev middleware exposes retired onboarding/chat routes')
+expect(css.includes('.status-bubble') && css.includes('@media(max-width:520px){') && css.includes('.status-bubble{display:none}'), 'Small-screen bubble hiding contract is missing')
+expect(css.includes('.member-modal-backdrop') && css.includes('.member-detail') && css.includes('.source-preview') && css.includes('@media(prefers-reduced-motion:no-preference)'), 'Read-only modal/backdrop or reduced-motion styles are missing')
 for (const index of [...homeSpots.keys(), homeSpots.length, homeSpots.length + 1]) {
   const spot = memberHomePosition(index)
-  if (!memberHomeIsClearOfPersistentUi(spot, 'desktop') || !memberHomeIsClearOfPersistentUi(spot, 'mobile')) throw new Error(`Member home ${index} overlaps a persistent UI region`)
+  expect(memberHomeIsClearOfPersistentUi(spot, 'desktop') && memberHomeIsClearOfPersistentUi(spot, 'mobile'), `Member home ${index} overlaps a persistent UI region`)
 }
-if (!css.includes('.mission-board{pointer-events:none}') || !css.includes('.mission-board button{pointer-events:auto}')) throw new Error('Mission Board must not block member-home hit targets outside its buttons')
-console.log('Validated full-viewport village, scoped Mission Board answers, safe source drawer, and responsive Wiki interiors.')
+const member = { id: 'atlas', documentIds: ['atlas-public', 'atlas-private-path', 'lumi-public', 'project-record'] }
+const documents = [{ id: 'atlas-public', scope: 'personal', memberId: 'atlas', source: 'members/atlas/wiki/index.md' }, { id: 'atlas-private-path', scope: 'personal', memberId: 'atlas', source: 'members/atlas/CONTEXT.md' }, { id: 'lumi-public', scope: 'personal', memberId: 'lumi', source: 'members/lumi/wiki/index.md' }, { id: 'project-record', scope: 'project', memberId: null, source: 'projects/wiki/index.md' }]
+const skills = [{ id: 'atlas-skill', scope: 'member', memberId: 'atlas' }, { id: 'lumi-skill', scope: 'member', memberId: 'lumi' }, { id: 'project-skill', scope: 'project', memberId: null }]
+const repository = { remoteNews: [{ scope: 'member', memberId: 'atlas', path: 'members/atlas/wiki/a.md' }, { scope: 'project', memberId: 'atlas', path: 'projects/wiki/unsafe.md' }], dirty: [{ scope: 'member', memberId: 'lumi', path: 'members/lumi/wiki/b.md' }] }
+expect(!canRenderVillage({ projectState: 'PROJECT_UNINITIALIZED', projectContext: null }) && !canRenderVillage({ projectState: 'PROJECT_READY', projectContext: {} }) && !canRenderVillage({ projectState: 'UNKNOWN', projectContext: { title: 'Project' } }) && canRenderVillage({ projectState: 'PROJECT_READY', projectContext: { title: 'Project' } }), 'Project state projection is not honest')
+expect(publicMemberDocuments(member, documents).map(document => document.id).join(',') === 'atlas-public', 'Member document allowlist crossed scope or member boundary')
+expect(publicMemberSkills(member, skills).map(skill => skill.id).join(',') === 'atlas-skill', 'Member skill metadata crossed a member boundary')
+expect(memberPublicChanges(repository, 'atlas').map(item => item.path).join(',') === 'members/atlas/wiki/a.md', 'Member change metadata crossed scope or member boundary')
+console.log('Validated CLI empty state, read-only village/detail boundaries, repository refresh, and responsive layout.')

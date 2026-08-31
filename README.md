@@ -4,7 +4,7 @@
 
 ### **Build a living Wiki. See its work as a guild.**
 
-프로젝트의 지식을 대화로 설계하고, 실제 Markdown Wiki로 만들며, 그 진행을 따뜻한 픽셀 길드에서 보는 로컬 우선 도구입니다.
+CLI로 프로젝트 Wiki를 설계·승인·생성하고, 저장된 공개 상태를 따뜻한 픽셀 길드에서 읽는 로컬 우선 도구입니다.
 
 ![Node.js](https://img.shields.io/badge/Node.js-18%2B-3C873A?logo=nodedotjs&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-149ECA?logo=react&logoColor=white)
@@ -20,7 +20,7 @@
 
 ## 이 프로젝트가 무엇인가
 
-Knowledge Guild RPG는 짧은 자유 입력을 바탕으로 프로젝트에 맞는 Wiki 구조를 제안하고, 승인 뒤에만 로컬 Markdown 파일을 만드는 **Wiki Architect**입니다. 같은 핵심 로직은 명령줄과 로컬 API에서 실행되고, 픽셀 마을은 그 실제 상태를 보여 주고 조작하는 화면입니다. 이미 만든 Wiki에서는 허용된 근거 범위 안에서만 답하는 길드 질문 기능을 제공합니다.
+Knowledge Guild RPG는 짧은 자유 입력을 바탕으로 프로젝트에 맞는 Wiki 구조를 제안하고, 승인 뒤에만 로컬 Markdown 파일을 만드는 **Wiki Architect**입니다. 사용자-facing 생성 경로는 JSONL CLI이며, 픽셀 마을은 safe snapshot과 공개 Git 경로 metadata를 읽기 전용으로 보여 줍니다.
 
 ## 핵심 그림
 
@@ -29,11 +29,11 @@ Headless Wiki Architect / Core
   ├─ 프로젝트 해석 · clarification · blueprint 검증 · 승인 적용 · 파일 계획
   ├─ 구조화 이벤트(JSONL): session.started, blueprint.proposed, files.written …
   ↓
-CLI / local API
-  ├─ 터미널, 자동화, 로컬 서버가 같은 core를 호출
+CLI
+  ├─ 터미널과 자동화가 같은 core를 호출
   ↓
 React pixel UI projection
-  └─ 길드홀·캐릭터·말풍선은 실제 이벤트와 저장된 Wiki 상태를 표현
+  └─ 길드홀·캐릭터·말풍선은 저장된 Wiki snapshot과 공개 경로 metadata만 표현
 ```
 
 즉, **CLI에서 움직이는 Wiki 하네스를 픽셀 길드로 봅니다.** 브라우저가 Wiki 파일을 직접 읽거나 쓰는 척하지 않으며, 애니메이션이 작업 완료를 만들어 내지도 않습니다.
@@ -45,7 +45,7 @@ React pixel UI projection
 - 승인 전에는 파일을 쓰지 않고, 승인 뒤에는 local writable mode에서 안전한 경로만 원자적으로 생성합니다.
 - `raw/`(원본), 컴파일된 `wiki/`, `output/`(결과물), index/log를 분리한 구조를 만듭니다.
 - 프로젝트 공통 기록 또는 한 멤버의 허용된 Wiki 기록에 질문하고, 인용·신뢰도·한계·모드를 함께 확인합니다.
-- 픽셀 마을에서 프로젝트 길드홀과 멤버별 Wiki 공간을 봅니다. 캐릭터를 선택해 scope를 고른 뒤 질문하면, 진행 중에는 해당 캐릭터의 answer bubble이, 완료 뒤에는 Answer Scroll과 allowlisted source citation이 표시됩니다.
+- 픽셀 마을에서 저장된 프로젝트 길드홀과 멤버별 공개 Wiki 상태를 봅니다. 캐릭터 상세에서는 해당 member의 allowlisted 출처 요약과 스킬 metadata만 확인합니다.
 - repository status와 길드 연출은 허용된 공개 Wiki path의 상태를 표현할 뿐, 실제 사람의 활동·의도·가용성을 뜻하지 않습니다.
 
 ## 3분 시작하기
@@ -63,7 +63,7 @@ npm ci
 npm run dev -- --host 0.0.0.0
 ```
 
-터미널에 나온 `http://localhost:5173`은 **내 컴퓨터에서만** 여는 주소입니다. 같은 Wi-Fi의 다른 기기에서 보려면 `http://내-LAN-IP:5173`을 사용합니다. LAN에서는 분석과 파일 계획 미리보기까지만 가능하고, 실제 저장은 이 컴퓨터의 `localhost` 또는 CLI에서만 허용됩니다. 화면은 처음부터 이 제한을 표시합니다.
+터미널에 나온 `http://localhost:5173`은 저장된 safe snapshot을 읽는 화면입니다. 같은 Wi-Fi의 다른 기기에서 보려면 `http://내-LAN-IP:5173`을 사용합니다. 프로젝트 해석, preview, save는 모두 CLI에서 실행합니다.
 
 AI provider는 선택 사항입니다. 사용하려면 `apps/wiki-village/.env.example`을 참고해 같은 폴더에 `.env`를 만들고 서버 전용 키를 넣습니다. `.env`와 API 키는 커밋하지 말고 `VITE_` 접두사에도 넣지 마세요. Architect는 항상 `mode`, `providerStatus`, 안전한 diagnostic을 표시합니다. 키 없음(`not-configured`), 응답 형식 오류(`malformed-response`), 네트워크 오류(`unavailable`), 기타 provider 실패(`failed`)는 **local draft**로 분명히 구분됩니다. 비용이 드는 연결 점검은 `KNOWLEDGE_GUILD_PROVIDER_SMOKE=1`과 키를 함께 설정한 뒤에만 `npm run test:provider-smoke`로 실행합니다.
 
@@ -79,16 +79,7 @@ node scripts/release-quickstart.mjs --target <new-absolute-directory-outside-thi
 
 ## 첫 Wiki 만들기
 
-처음 열면 완성된 마을 대신 Wiki Architect 안내 화면이 보입니다.
-
-1. “무엇을 만들거나 해결하려고 하나요?”에 떠오르는 대로 적습니다.
-2. Architect가 의도, 알려진 사실·가정·미지점, 추천 pipeline/page type을 해석합니다.
-3. 정말 필요한 정보가 있을 때만 clarification을 묻습니다. 충분하면 바로 다음 단계로 갑니다.
-4. **내가 이렇게 이해했다** 요약과 **이 구조로 Wiki를 만들겠다** blueprint를 고칩니다.
-5. 표시 이름과 `member-id`를 한 번 확인합니다.
-6. 생성될 파일 목록을 미리 보고 승인합니다.
-
-승인 뒤에만 `projects/`와 해당 `members/{member-id}/`에 scaffold가 생성됩니다. 이후 프로젝트 길드홀과 그 멤버의 캐릭터가 마을에 나타납니다.
+웹에서 유효 프로젝트가 없으면 프로젝트 건물이나 예제 member 없이 아래 CLI 시작 명령만 보입니다. `analyze` 뒤에는 실제 blueprint로 `preview`를 확인하고, digest를 넣은 `save`를 승인해 실행하세요. 승인 뒤에만 `projects/`와 해당 `members/{member-id}/`에 scaffold가 생성되며, 다음 snapshot build에서 프로젝트 길드홀과 member가 마을에 투영됩니다.
 
 ## CLI 사용법
 
@@ -178,16 +169,16 @@ members/<member-id>/
 
 중앙 **프로젝트 길드홀**은 `projects/`의 공통 맥락만 나타냅니다. 각 **캐릭터와 집**은 오직 해당 `members/{member-id}/wiki/**`의 공개 개인 Wiki 범위만 나타냅니다. `CONTEXT.md`와 `WIKI_SCHEMA.md`는 멤버를 식별·검증하는 로컬 설정이며 snapshot, evidence, citation source가 아닙니다. 개인 관점은 자동으로 공통 사실이나 공식 결정이 되지 않습니다.
 
-캐릭터의 포즈, 말풍선, 활동처럼 보이는 연출은 작업 이벤트를 읽기 쉽게 표시하는 중립적인 visual state입니다. 실제 사람의 상태, 의도, 온라인 여부, 가용성을 주장하지 않습니다.
+캐릭터의 포즈와 말풍선은 public snapshot의 마지막 경로 변경일 또는 사용자가 갱신한 공개 Git path metadata만 읽는 중립 visual state입니다. 실제 사람의 상태, 의도, 온라인 여부, 가용성을 주장하지 않습니다.
 
 ## 보안과 데이터 경계
 
 - 공개 snapshot·evidence·citation 대상은 승인된 project Wiki와 `members/{member-id}/wiki/**`뿐입니다. member의 `CONTEXT.md`, `WIKI_SCHEMA.md`, `raw/`, `output/`, private profile/context, secrets는 그 대상이 아닙니다.
 - `.env`, API 키, project/member raw·output·private·secrets는 커밋하지 않습니다. `.gitignore`는 이 로컬 경계를 보호합니다.
 - 사용자의 원문, AI 제안, 승인된 blueprint를 구분합니다. 승인 전에는 canonical 파일을 만들지 않습니다.
-- local writable mode만 실제 repository 쓰기를 수행합니다. Vercel 같은 read-only 배포는 preview/export 화면일 뿐, 저장됐다고 말하지 않습니다.
+- CLI의 local writable mode만 실제 repository 쓰기를 수행합니다. Vercel 같은 read-only 배포는 preview/export 화면일 뿐, 저장됐다고 말하지 않습니다.
 - member-id는 소문자·숫자·하이픈만 허용하며, 다른 멤버 공간이나 저장소 밖 경로로 쓰는 요청은 거부합니다.
-- 근거 기반 답변은 선택한 project/member scope와 citation allowlist 밖의 기록을 섞지 않습니다.
+- 웹 출처 미리보기는 safe snapshot의 같은 member `personal` 문서만 다시 검사해 표시합니다. 브라우저는 Wiki 원문을 읽거나 질문을 제출하지 않습니다.
 
 ## 테스트 명령
 

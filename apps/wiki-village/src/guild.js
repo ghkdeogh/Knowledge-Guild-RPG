@@ -25,13 +25,20 @@ export function activityBand(lastPublicActivity, now = new Date()) {
   const nowTime = now instanceof Date ? now.getTime() : Date.parse(now)
   if (!Number.isFinite(timestamp) || !Number.isFinite(nowTime)) return { id: 'neutral', pose: 'idle', label: '중립 대기', lastPublicActivity: null }
   const days = Math.max(0, Math.floor((nowTime - timestamp) / 86400000))
-  if (days <= 7) return { id: 'crafting', pose: 'crafting', label: '기록 정리', lastPublicActivity, days }
-  if (days <= 14) return { id: 'wandering', pose: 'reading', label: '기록 읽기', lastPublicActivity, days }
-  if (days <= 29) return { id: 'resting', pose: 'resting', label: '휴식', lastPublicActivity, days }
-  return { id: 'sleeping', pose: 'sleeping', label: '집에서 휴식', lastPublicActivity, days }
+  if (days <= 7) return { id: 'crafting', pose: 'crafting', label: '최근 공개 경로 변경일', lastPublicActivity, days }
+  if (days <= 14) return { id: 'wandering', pose: 'reading', label: '최근 공개 경로 변경일', lastPublicActivity, days }
+  if (days <= 29) return { id: 'resting', pose: 'resting', label: '최근 공개 경로 변경일', lastPublicActivity, days }
+  return { id: 'sleeping', pose: 'sleeping', label: '최근 공개 경로 변경일', lastPublicActivity, days }
 }
 
-export const activityDescription = activity => activity?.lastPublicActivity ? `최근 공개 저장소 활동 ${activity.lastPublicActivity} · ${activity.label}` : '최근 공개 저장소 활동 날짜를 확인하지 못함 · 중립 대기'
+export const activityDescription = activity => activity?.lastPublicActivity ? `최근 공개 경로 변경일 ${activity.lastPublicActivity}` : '최근 공개 경로 변경일을 확인하지 못함 · 중립 대기'
+
+export const memberActivity = (member, repository) => {
+  const lastDate = repository?.members?.[member?.id]?.lastDate
+  return typeof lastDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(lastDate)
+    ? activityBand(lastDate)
+    : member?.activity || activityBand(null)
+}
 
 export function repositoryPathState(memberId, repository, seenNews = {}) {
   const state = repository?.members?.[memberId]
