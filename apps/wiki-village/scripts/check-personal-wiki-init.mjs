@@ -49,7 +49,8 @@ for (const item of [research, product, creative]) {
   expect(await absent(join(item.member, 'WIKI_INDEX.md')) && await absent(join(item.member, 'ACTIVITY_LOG.md')) && await absent(join(item.member, 'harnesses')), 'old files were written')
 }
 const before = await readFile(join(product.member, 'CLAUDE.md'))
-expect(before.subarray(0, Buffer.byteLength(context('제품 기획에서 고객 피드백과 회의 메모를 분석해 제품 명세와 보고서를 만든다.'))).equals(Buffer.from(context('제품 기획에서 고객 피드백과 회의 메모를 분석해 제품 명세와 보고서를 만든다.'))) && (before.toString('utf8').match(/wiki-operation-rules:start/g) || []).length === 1, 'new root CLAUDE did not preserve the CONTEXT prefix or include one managed rules block')
+const freshClaude = before.toString('utf8'); const productContext = context('제품 기획에서 고객 피드백과 회의 메모를 분석해 제품 명세와 보고서를 만든다.')
+expect(!freshClaude.includes(productContext) && freshClaude.includes('read the selected member\'s PROFILE.md') && freshClaude.includes('CONTEXT.md') && freshClaude.includes('prompts/llm-wiki.md') && freshClaude.includes('feedback') && freshClaude.includes('problems') && freshClaude.includes('specs') && freshClaude.includes('Ingest compiles') && freshClaude.includes('Query reads') && freshClaude.includes('Lint identifies') && (freshClaude.match(/wiki-operation-rules:start/g) || []).length === 1, 'fresh root CLAUDE copied CONTEXT instead of creating a personalized Karpathy contract')
 expect((await readFile(join(product.member, 'CONTEXT.md'))).equals(Buffer.from(context('제품 기획에서 고객 피드백과 회의 메모를 분석해 제품 명세와 보고서를 만든다.'))), 'fresh CONTEXT changed')
 expect((await readFile(join(product.member, 'PROFILE.md'))).equals(Buffer.from(profile('planner profile', '제품 기획에서 고객 피드백과 회의 메모를 분석해 제품 명세와 보고서를 만든다.'))), 'fresh PROFILE changed')
 
@@ -106,7 +107,7 @@ const priorStart = await startPersonalWikiInit({ memberId: 'prior-managed' }, { 
 expect(noForbiddenPlanPaths(priorStart.result.preview.files), 'prior-managed migration planned forbidden harness or skill paths')
 const priorApproved = await advancePersonalWikiInit(priorStart.state, { action: 'approve', expectedDigest: priorStart.result.preview.digest }, { repoRoot: root }); await savePersonalWikiInit(priorApproved.state, { action: 'save', expectedDigest: priorStart.result.preview.digest }, { repoRoot: root })
 expect((await readFile(join(priorManaged, 'CONTEXT.md'), 'utf8')) === priorContext && (await readFile(join(priorManaged, 'CLAUDE.md'), 'utf8')).includes('Personal LLM Wiki operations'), 'CONTEXT was changed or root CLAUDE was not generated')
-const malformedMarker = await fixture('malformed-marker', profile('malformed-marker', '연구 논문과 데이터로 실험을 조사하고 조사 보고서를 만든다.'), `${context('연구 논문과 데이터로 실험을 조사하고 조사 보고서를 만든다.')}\n<!-- wiki-operation-rules:end -->\n`)
+const malformedMarker = await fixture('malformed-marker', profile('malformed-marker', '연구 논문과 데이터로 실험을 조사하고 조사 보고서를 만든다.'), context('연구 논문과 데이터로 실험을 조사하고 조사 보고서를 만든다.'), { existingClaude: '# Existing contract\n<!-- wiki-operation-rules:end -->\n' })
 await startPersonalWikiInit({ memberId: 'malformed-marker' }, { repoRoot: root }).then(() => fail('malformed managed marker was accepted'), error => expect(error.code === 'migration-required', 'malformed marker did not fail closed'))
 
 const migrationStale = await fixture('migration-stale', profile('migration-stale', '연구 논문과 데이터로 실험을 조사하고 조사 보고서를 만든다.'), context('연구 논문과 데이터로 실험을 조사하고 조사 보고서를 만든다.'))
