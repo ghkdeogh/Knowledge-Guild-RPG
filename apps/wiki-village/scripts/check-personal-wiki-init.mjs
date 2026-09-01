@@ -27,10 +27,13 @@ const runFresh = async (id, text) => {
   expect(started.state.phase === 'preview', `${id}: expected evidence-backed preview`)
   const paths = started.result.preview.files.map(file => file.path)
   expect(paths.some(path => path.endsWith('/CLAUDE.md')) && paths.some(path => path.endsWith('/raw/CLAUDE.md')) && paths.some(path => path.endsWith('/wiki/CLAUDE.md')) && paths.some(path => path.endsWith('/wiki/index.md')) && paths.some(path => path.endsWith('/wiki/log.md')) && paths.some(path => path.endsWith('/output/CLAUDE.md')), `${id}: required CLAUDE/index/log files missing`)
+  const requirements = started.result.preview.requirements
+  expect(requirements.map(item => item.id).join(',') === '1,2,3,4,5' && requirements[0].paths.every(path => paths.some(file => file.startsWith(path))) && requirements.slice(1).every(item => item.paths.every(path => paths.includes(path))), `${id}: required outcomes 1–5 are not explicit and planned`)
   expect(noForbiddenPlanPaths(started.result.preview.files) && !paths.some(path => /WIKI_INDEX|ACTIVITY_LOG/.test(path)), `${id}: prohibited legacy scaffold leaked`)
   const approved = await advancePersonalWikiInit(started.state, { action: 'approve', expectedDigest: started.result.preview.digest }, { repoRoot: root })
   const saved = await savePersonalWikiInit(approved.state, { action: 'save', expectedDigest: started.result.preview.digest }, { repoRoot: root })
   expect(saved.state.phase === 'saved', `${id}: save failed`)
+  expect(saved.result.requirements?.map(item => item.id).join(',') === '1,2,3,4,5', `${id}: save result omitted required outcomes`)
   return { paths, member: join(root, 'members', id) }
 }
 

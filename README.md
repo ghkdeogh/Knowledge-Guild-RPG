@@ -95,7 +95,7 @@ node scripts/release-quickstart.mjs --target <new-absolute-directory-outside-thi
 '@ | node scripts/personal-wiki-init-cli.mjs
 ```
 
-preview 후 같은 세션에서 `{"action":"approve","expectedDigest":"<digest>"}`와 별도 `save`를 보냅니다. PROFILE/root CLAUDE를 OpenAI Responses 제공자에 보낼 수 있는 경우에만 시작 요청에 `"providerApproved":true`를 넣으세요. 기존 scaffold나 root CLAUDE의 managed operations block이 있으면 keep/add/replace migration diff를 먼저 보여 줍니다. `migrationApproved:true`로 승인하면 preview에 선언된 root/scoped `CLAUDE.md`·`WIKI_SCHEMA.md`·`wiki/index.md`만 recoverable backup과 함께 교체합니다. PROFILE+CONTEXT/no-CLAUDE legacy member는 compatibility bootstrap으로 root CLAUDE를 add하고 CONTEXT를 그대로 보존합니다. `WIKI_INDEX.md`, `ACTIVITY_LOG.md`, harness, raw/wiki/output 사용자 내용은 legacy/unmanaged로 남기며 삭제·이동하지 않습니다. 기존 `wiki-architect`의 personal `preview/save`는 더 이상 사용할 수 없으며 프로필 뒤 기본 초기화 경로는 personal initializer입니다.
+preview에는 목적 기반 `raw → wiki → output` 구조, root/layer CLAUDE, `wiki/index.md`, `wiki/log.md`의 다섯 필수 결과가 번호와 경로로 표시됩니다. 같은 세션에서 `{"action":"approve","expectedDigest":"<digest>"}`와 별도 `save`를 보냅니다. PROFILE/root CLAUDE를 OpenAI Responses 제공자에 보낼 수 있는 경우에만 시작 요청에 `"providerApproved":true`를 넣으세요. 기존 scaffold나 root CLAUDE의 managed operations block이 있으면 keep/add/replace migration diff를 먼저 보여 줍니다. `migrationApproved:true`로 승인하면 preview에 선언된 root/scoped `CLAUDE.md`·`WIKI_SCHEMA.md`·`wiki/index.md`만 recoverable backup과 함께 교체합니다. PROFILE+CONTEXT/no-CLAUDE legacy member는 compatibility bootstrap으로 root CLAUDE를 add하고 CONTEXT를 그대로 보존합니다. `WIKI_INDEX.md`, `ACTIVITY_LOG.md`, harness, raw/wiki/output 사용자 내용은 legacy/unmanaged로 남기며 삭제·이동하지 않습니다. 기존 `wiki-architect`의 personal `preview/save`는 더 이상 사용할 수 없으며 프로필 뒤 기본 초기화 경로는 personal initializer입니다.
 
 ## CLI 사용법
 

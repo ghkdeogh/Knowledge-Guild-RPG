@@ -2,6 +2,16 @@
 
 사용자가 “위키 초기화해줘”라고 요청하면, 프로필 온보딩 뒤의 개인화 LLM Wiki 초기화 흐름을 사용한다. 이 작업은 고정 scaffold를 만드는 일이 아니라 Karpathy LLM Wiki의 `raw → wiki → output` 패턴을 개인의 승인된 맥락으로 인스턴스화하는 일이다.
 
+## 필수 결과 — 해줄 것
+
+1. **내 목적에 맞는 폴더 구조 만들기**: `raw/`에는 내 input 유형별 불변 원본 하위 폴더, `wiki/`에는 AI가 컴파일할 지식 영역 하위 폴더, `output/`에는 내 결과물 유형별 하위 폴더를 근거에 맞춰 만든다. 사용자가 말하는 “Output”도 실제 경로는 cross-platform 안전한 lowercase `output/`으로 쓴다.
+2. 기존 member root `CLAUDE.md`의 byte를 보존하고, marker로 구분된 managed Wiki 운영 규칙 block만 append 또는 승인된 migration에서 replace한다.
+3. `raw/CLAUDE.md`, `wiki/CLAUDE.md`, `output/CLAUDE.md`의 scoped 운영 계약을 만든다.
+4. `wiki/index.md`를 초기화한다.
+5. `wiki/log.md`를 초기화한다.
+
+근거가 세 계층의 목적별 하위 폴더를 뒷받침하지 못하면 한 번만 clarification을 요청한다. 그래도 부족하면 `insufficient-context`로 끝내며, 세 계층 자체나 위 다섯 결과를 임의로 생략하지 않는다.
+
 ## Scope and privacy
 
 1. 현재 `member-id`를 확인하고 `WIKI_RULES.md`와 `prompts/llm-wiki.md`를 끝까지 읽는다.
