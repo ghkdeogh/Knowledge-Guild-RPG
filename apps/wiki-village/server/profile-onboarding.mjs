@@ -165,9 +165,9 @@ export function renderProfileFiles(state) {
   const summaryMode = answers.some(answer => answer.mode === 'local-draft') ? 'local-draft' : 'llm-suggestion'
   const heading = `# ${state.displayName}의 프로필`
   const profile = `${heading}\n\n> 아래 내용은 원문 답변이나 seed 원문이 아닌, 승인 전 화면으로 확인한 구조화 요약입니다. 해석 모드: ${summaryMode}.\n\n## 나의 맥락 요약\n\n${[seedContext, ...answers.map(answer => `- ${answer.summary}`)].filter(Boolean).join('\n')}\n\n## 사실로 확인된 내용\n\n- 표시 이름: ${state.displayName}\n${seedContext}\n\n## 나의 관점과 선호\n\n### 나는 누구인가\n\n${list(identity.strengths)}\n${list(identity.values)}\n\n### 기록하려는 이유\n\n${list(recording.gaps)}\n${vision ? `- 바라는 모습: ${vision}` : ''}\n\n### 원하는 결과물\n\n${list(outputs.audiences)}\n${list(outputs.formats)}\n${oneYearState ? `- 1년 뒤: ${oneYearState}` : ''}\n\n## 아직 알 수 없는 내용\n\n`
-  const claude = `# ${state.displayName} Personal AI Context\n\n> 이 문서는 승인된 PROFILE.md에서 매 실행 시 읽는 canonical personal context입니다. 해석 모드: ${summaryMode}. 원문 답변과 seed 원문은 저장하지 않습니다. Wiki 초기화 전까지는 개인 맥락만 담고, 이후 초기화기는 marker로 구분된 Wiki 운영 규칙만 추가합니다.\n\n## 나는 누구인가\n\n${[...list(identity.strengths).split('\n'), ...list(identity.values).split('\n'), seedContext].filter(Boolean).join('\n')}\n\n## 나의 역할들\n\n${list(identity.roles)}\n\n## 나의 비전과 목표\n\n${[...list(recording.gaps).split('\n'), vision ? `- ${vision}` : '', ...list(outputs.audiences).split('\n'), ...list(outputs.formats).split('\n'), oneYearState ? `- ${oneYearState}` : ''].filter(Boolean).join('\n')}\n\n## AI에게 기대하는 것\n\n${list(outputs.aiExpectations)}\n\n## 작업 규칙\n\n${list(outputs.workRules)}\n`
+  const context = `# ${state.displayName} Personal Context\n\n> 이 문서는 승인된 PROFILE.md에서 매 실행 시 읽는 간결한 개인 맥락입니다. 해석 모드: ${summaryMode}. 원문 답변과 seed 원문은 저장하지 않습니다. Wiki 초기화기는 이 문서와 PROFILE.md, prompts/llm-wiki.md를 읽어 별도의 CLAUDE.md 운영 계약을 만듭니다.\n\n## 나는 누구인가\n\n${[...list(identity.strengths).split('\n'), ...list(identity.values).split('\n'), seedContext].filter(Boolean).join('\n')}\n\n## 나의 역할들\n\n${list(identity.roles)}\n\n## 나의 비전과 목표\n\n${[...list(recording.gaps).split('\n'), vision ? `- ${vision}` : '', ...list(outputs.audiences).split('\n'), ...list(outputs.formats).split('\n'), oneYearState ? `- ${oneYearState}` : ''].filter(Boolean).join('\n')}\n\n## AI에게 기대하는 것\n\n${list(outputs.aiExpectations)}\n\n## 작업 규칙\n\n${list(outputs.workRules)}\n`
   const base = `members/${state.memberId}`
-  return { [`${base}/PROFILE.md`]: profile, [`${base}/CLAUDE.md`]: claude }
+  return { [`${base}/PROFILE.md`]: profile, [`${base}/CONTEXT.md`]: context }
 }
 
 export function previewProfileOnboarding(state) {
@@ -187,9 +187,9 @@ async function savePreview(preview, repoRoot) {
   const root = resolve(repoRoot)
   const memberId = preview.files[0]?.path.match(/^members\/([^/]+)\//)?.[1]
   await ensureExistingMemberScope(root, memberId, { create: true })
-  const targets = preview.files.map(file => resolve(root, file.path)); const legacyContext = resolve(root, 'members', memberId, 'CONTEXT.md')
+  const targets = preview.files.map(file => resolve(root, file.path)); const existingClaude = resolve(root, 'members', memberId, 'CLAUDE.md')
   for (const target of targets) if (!target.startsWith(`${resolve(root, 'members')}${sep}`)) fail('개인 member 공간 밖에는 저장할 수 없습니다.', 'unsafe-path')
-  if (await Promise.all([...targets, legacyContext].map(exists)).then(values => values.some(Boolean))) fail('기존 PROFILE.md, CLAUDE.md 또는 legacy CONTEXT.md를 덮어쓰지 않았습니다.', 'collision', 409)
+  if (await Promise.all([...targets, existingClaude].map(exists)).then(values => values.some(Boolean))) fail('기존 PROFILE.md, CONTEXT.md 또는 CLAUDE.md를 덮어쓰지 않았습니다.', 'collision', 409)
   const stage = resolve(root, `.profile-onboarding-${randomUUID()}`)
   const created = []
   try {
@@ -202,7 +202,7 @@ async function savePreview(preview, repoRoot) {
     }
     for (const file of preview.files) {
       const target = resolve(root, file.path)
-      if (await exists(target) || await exists(legacyContext)) fail('기존 PROFILE.md, CLAUDE.md 또는 legacy CONTEXT.md를 덮어쓰지 않았습니다.', 'collision', 409)
+      if (await exists(target) || await exists(existingClaude)) fail('기존 PROFILE.md, CONTEXT.md 또는 CLAUDE.md를 덮어쓰지 않았습니다.', 'collision', 409)
       await mkdir(dirname(target), { recursive: true })
       await link(resolve(stage, file.path), target)
       created.push(target)
@@ -231,7 +231,7 @@ export async function advanceProfileOnboarding(current, input = {}, options = {}
       return { state: next, events: [event('answer.received', { id: 'display-name' }), event('question.asked', { id: 'member-id', question: '저장 경로에 사용할 member-id를 알려주세요. 영문 소문자, 숫자, 하이픈만 사용할 수 있습니다.' })] }
     }
     const next = session('privacy', { ...state, displayName, memberId: derivedId })
-    return { state: next, events: [event('answer.received', { id: 'display-name' }), event('privacy.warning', { message: 'PROFILE.md와 개인 CLAUDE.md는 Git에 커밋되면 저장소 접근자가 읽을 수 있습니다. 공유해도 되는 내용만 답변해 주세요. 외부 AI 제공자에 답변과 승인된 seed 원문을 보내는 것은 기본값이 아니며 providerApproved: true를 별도로 선택할 때만 가능합니다.' }), event('privacy.confirmation.required', { question: '공개 범위를 이해했고, 공유 가능한 내용만 답변하시겠어요?' })] }
+    return { state: next, events: [event('answer.received', { id: 'display-name' }), event('privacy.warning', { message: 'PROFILE.md와 CONTEXT.md는 Git에 커밋되면 저장소 접근자가 읽을 수 있습니다. 공유해도 되는 내용만 답변해 주세요. 외부 AI 제공자에 답변과 승인된 seed 원문을 보내는 것은 기본값이 아니며 providerApproved: true를 별도로 선택할 때만 가능합니다.' }), event('privacy.confirmation.required', { question: '공개 범위를 이해했고, 공유 가능한 내용만 답변하시겠어요?' })] }
   }
   if (state.phase === 'member-id') {
     if (action !== 'answer') fail('저장용 member-id에 답해 주세요.', 'unexpected-action')
@@ -239,7 +239,7 @@ export async function advanceProfileOnboarding(current, input = {}, options = {}
     const memberId = safeMemberId(input.answer)
     memberPath(repoRoot, memberId)
     const next = session('privacy', { ...state, memberId })
-    return { state: next, events: [event('answer.received', { id: 'member-id' }), event('privacy.warning', { message: 'PROFILE.md와 개인 CLAUDE.md는 Git에 커밋되면 저장소 접근자가 읽을 수 있습니다. 공유해도 되는 내용만 답변해 주세요. 외부 AI 제공자에 답변과 승인된 seed 원문을 보내는 것은 기본값이 아니며 providerApproved: true를 별도로 선택할 때만 가능합니다.' }), event('privacy.confirmation.required', { question: '공개 범위를 이해했고, 공유 가능한 내용만 답변하시겠어요?' })] }
+    return { state: next, events: [event('answer.received', { id: 'member-id' }), event('privacy.warning', { message: 'PROFILE.md와 CONTEXT.md는 Git에 커밋되면 저장소 접근자가 읽을 수 있습니다. 공유해도 되는 내용만 답변해 주세요. 외부 AI 제공자에 답변과 승인된 seed 원문을 보내는 것은 기본값이 아니며 providerApproved: true를 별도로 선택할 때만 가능합니다.' }), event('privacy.confirmation.required', { question: '공개 범위를 이해했고, 공유 가능한 내용만 답변하시겠어요?' })] }
   }
   if (state.phase === 'privacy') {
     if (action !== 'privacy' || input.approved !== true) fail('세 질문을 시작하기 전에 공개 범위를 명시적으로 확인해 주세요.', 'privacy-confirmation-required')
@@ -278,7 +278,7 @@ export async function advanceProfileOnboarding(current, input = {}, options = {}
     if (input.expectedDigest !== state.approvedDigest) fail('승인한 digest와 저장 요청이 일치하지 않습니다.', 'preview-mismatch')
     const preview = previewProfileOnboarding({ ...state, phase: 'preview' })
     await savePreview(preview, repoRoot)
-    return { state: session('saved', { ...state }), events: [event('files.written', { files: preview.files.map(file => file.path) }), event('personal-wiki-init.next-step', { command: `node scripts/personal-wiki-init-cli.mjs --repo-root <repository-root>`, request: { action: 'start', memberId: state.memberId }, note: 'PROFILE.md와 canonical personal CLAUDE.md를 읽어 개인화 Wiki 구조를 preview한 뒤 승인해 초기화합니다.' }), event('session.completed', { phase: 'saved' })], result: { files: preview.files.map(file => file.path) } }
+    return { state: session('saved', { ...state }), events: [event('files.written', { files: preview.files.map(file => file.path) }), event('personal-wiki-init.next-step', { command: `node scripts/personal-wiki-init-cli.mjs --repo-root <repository-root>`, request: { action: 'start', memberId: state.memberId }, note: 'PROFILE.md, CONTEXT.md와 prompts/llm-wiki.md를 읽어 개인화 Wiki 구조와 CLAUDE.md 운영 계약을 preview한 뒤 승인해 초기화합니다.' }), event('session.completed', { phase: 'saved' })], result: { files: preview.files.map(file => file.path) } }
   }
   fail('이미 저장이 완료된 세션입니다.', 'session-complete')
 }

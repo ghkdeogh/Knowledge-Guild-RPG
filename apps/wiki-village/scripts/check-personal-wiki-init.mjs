@@ -16,7 +16,7 @@ const git = promisify(execFile)
 const gitIgnored = async path => git('git', ['check-ignore', '-q', '--', path], { cwd: join(import.meta.dirname, '..', '..', '..') }).then(() => true).catch(() => false)
 const root = await mkdtemp(join(tmpdir(), 'personal-wiki-init-'))
 await mkdir(join(root, 'prompts'), { recursive: true }); await writeFile(join(root, 'prompts', 'llm-wiki.md'), '# Test LLM Wiki principles\n')
-const fixture = async (id, profile, personal, { legacyContext = false } = {}) => { const member = join(root, 'members', id); await mkdir(member, { recursive: true }); await writeFile(join(member, 'PROFILE.md'), profile); await writeFile(join(member, legacyContext ? 'CONTEXT.md' : 'CLAUDE.md'), personal); return member }
+const fixture = async (id, profile, personal, { existingClaude = null } = {}) => { const member = join(root, 'members', id); await mkdir(member, { recursive: true }); await writeFile(join(member, 'PROFILE.md'), profile); await writeFile(join(member, 'CONTEXT.md'), personal); if (existingClaude !== null) await writeFile(join(member, 'CLAUDE.md'), existingClaude); return member }
 const profile = (heading, details) => `# ${heading}\n\n## 나의 맥락 요약\n\n- ${details}\n\n## 원하는 결과물\n\n- ${details}\n`
 const context = details => `# Member Context\n\n## 작업 규칙\n\n- ${details}\n`
 await mkdir(join(root, 'projects'), { recursive: true }); await writeFile(join(root, 'projects', 'private-marker.md'), 'must remain unread and unchanged')
@@ -49,24 +49,36 @@ for (const item of [research, product, creative]) {
   expect(await absent(join(item.member, 'WIKI_INDEX.md')) && await absent(join(item.member, 'ACTIVITY_LOG.md')) && await absent(join(item.member, 'harnesses')), 'old files were written')
 }
 const before = await readFile(join(product.member, 'CLAUDE.md'))
-expect(before.subarray(0, Buffer.byteLength(context('제품 기획에서 고객 피드백과 회의 메모를 분석해 제품 명세와 보고서를 만든다.'))).equals(Buffer.from(context('제품 기획에서 고객 피드백과 회의 메모를 분석해 제품 명세와 보고서를 만든다.'))) && (before.toString('utf8').match(/wiki-operation-rules:start/g) || []).length === 1, 'existing CLAUDE prefix or managed rules changed')
+expect(before.subarray(0, Buffer.byteLength(context('제품 기획에서 고객 피드백과 회의 메모를 분석해 제품 명세와 보고서를 만든다.'))).equals(Buffer.from(context('제품 기획에서 고객 피드백과 회의 메모를 분석해 제품 명세와 보고서를 만든다.'))) && (before.toString('utf8').match(/wiki-operation-rules:start/g) || []).length === 1, 'new root CLAUDE did not preserve the CONTEXT prefix or include one managed rules block')
+expect((await readFile(join(product.member, 'CONTEXT.md'))).equals(Buffer.from(context('제품 기획에서 고객 피드백과 회의 메모를 분석해 제품 명세와 보고서를 만든다.'))), 'fresh CONTEXT changed')
 expect((await readFile(join(product.member, 'PROFILE.md'))).equals(Buffer.from(profile('planner profile', '제품 기획에서 고객 피드백과 회의 메모를 분석해 제품 명세와 보고서를 만든다.'))), 'fresh PROFILE changed')
 
 await mkdir(join(root, 'members', 'empty'), { recursive: true }); await writeFile(join(root, 'members', 'empty', 'PROFILE.md'), '# Empty\n')
 const insufficient = await startPersonalWikiInit({ memberId: 'empty' }, { repoRoot: root })
-expect(insufficient.result.status === 'insufficient-context' && await absent(join(root, 'members', 'empty', 'WIKI_SCHEMA.md')), 'insufficient input wrote files')
-const bothContexts = await fixture('both-contexts', profile('both-contexts', '연구 논문과 데이터로 실험을 조사하고 조사 보고서를 만든다.'), context('연구 논문과 데이터로 실험을 조사하고 조사 보고서를 만든다.'))
-await writeFile(join(bothContexts, 'CONTEXT.md'), '# Legacy Context\n\n- must not be silently merged\n')
+expect(insufficient.result.status === 'context-missing' && await absent(join(root, 'members', 'empty', 'WIKI_SCHEMA.md')), 'missing CONTEXT did not stop without writes')
+const transitional = await fixture('transitional', profile('transitional', '연구 논문과 데이터로 실험을 조사하고 조사 보고서를 만든다.'), context('unused context'))
+await (await import('node:fs/promises')).rm(join(transitional, 'CONTEXT.md'))
+await writeFile(join(transitional, 'CLAUDE.md'), '# Prior CLAUDE only\n- do not use this as input\n')
+const transitionalStart = await startPersonalWikiInit({ memberId: 'transitional' }, { repoRoot: root })
+expect(transitionalStart.result.status === 'context-missing' && transitionalStart.result.compatibility === 'profile-claude-without-context' && await absent(join(transitional, 'WIKI_SCHEMA.md')) && await readFile(join(transitional, 'CLAUDE.md'), 'utf8') === '# Prior CLAUDE only\n- do not use this as input\n', 'PROFILE+CLAUDE/no-CONTEXT transitional state did not stop without writes')
+const bothContexts = await fixture('both-contexts', profile('both-contexts', '연구 논문과 데이터로 실험을 조사하고 조사 보고서를 만든다.'), context('연구 논문과 데이터로 실험을 조사하고 조사 보고서를 만든다.'), { existingClaude: '# Existing CLAUDE\n\n- migration target only\n' })
 const bothStart = await startPersonalWikiInit({ memberId: 'both-contexts' }, { repoRoot: root })
-expect(bothStart.result.preview.primaryKind === 'CLAUDE' && !bothStart.result.migration.actions.some(action => action.path === 'CONTEXT.md'), 'existing CLAUDE did not take precedence over legacy CONTEXT')
+expect(bothStart.result.preview.contextDigest && bothStart.result.preview.principlesDigest && bothStart.result.migration.kind === 'existing-claude-update' && !bothStart.result.migration.actions.some(action => action.path === 'CONTEXT.md'), 'PROFILE/CONTEXT/principles were not the canonical inputs or existing CLAUDE was not a migration target')
+const principlesBefore = bothStart.result.preview.principlesDigest
+await writeFile(join(root, 'prompts', 'llm-wiki.md'), '# Changed principles\n')
+const changedPrinciples = await startPersonalWikiInit({ memberId: 'both-contexts' }, { repoRoot: root })
+expect(changedPrinciples.result.preview.principlesDigest !== principlesBefore && changedPrinciples.result.preview.digest !== bothStart.result.preview.digest, 'llm-wiki principles digest was not bound to preview')
+const stalePrinciplesApproved = await advancePersonalWikiInit(bothStart.state, { action: 'approve', expectedDigest: bothStart.result.preview.digest, migrationApproved: true }, { repoRoot: root })
+await savePersonalWikiInit(stalePrinciplesApproved.state, { action: 'save', expectedDigest: bothStart.result.preview.digest }, { repoRoot: root }).then(() => fail('changed llm-wiki principles must invalidate preview'), error => expect(error.code === 'preview-mismatch', 'llm-wiki principles change did not invalidate preview'))
+await writeFile(join(root, 'prompts', 'llm-wiki.md'), '# Test LLM Wiki principles\n')
 
-let providerCalls = 0
-const proof = [{ ref: 'CLAUDE:작업 규칙', span: '연구 논문과 데이터로 실험을 조사하고 조사 보고서를 만든다.' }]
-const fakeProvider = { responses: { create: async () => { providerCalls += 1; return { output_text: JSON.stringify({ raw: [{ id: 'papers', label: '연구 논문', purpose: '연구 논문 원본', evidence: proof, links: ['concepts'] }], wiki: [{ id: 'concepts', label: '연구 조사', purpose: '연구 조사 지식', evidence: proof, links: ['reports'] }], output: [{ id: 'reports', label: '조사 보고서', purpose: '조사 보고서 결과', evidence: proof, links: [] }] }) } } } }
+let providerCalls = 0; let providerInput = ''
+const proof = [{ ref: 'CONTEXT:작업 규칙', span: '연구 논문과 데이터로 실험을 조사하고 조사 보고서를 만든다.' }]
+const fakeProvider = { responses: { create: async request => { providerCalls += 1; providerInput = request.input; return { output_text: JSON.stringify({ raw: [{ id: 'papers', label: '연구 논문', purpose: '연구 논문 원본', evidence: proof, links: ['concepts'] }], wiki: [{ id: 'concepts', label: '연구 조사', purpose: '연구 조사 지식', evidence: proof, links: ['reports'] }], output: [{ id: 'reports', label: '조사 보고서', purpose: '조사 보고서 결과', evidence: proof, links: [] }] }) } } } }
 const noConsent = await startPersonalWikiInit({ memberId: 'researcher' }, { repoRoot: root, responsesClient: fakeProvider, providerConfig: { apiKey: 'x' } })
 expect(providerCalls === 0 && noConsent.result.providerStatus === 'not-consented', 'provider ran without consent')
 const consent = await startPersonalWikiInit({ memberId: 'researcher', providerApproved: true }, { repoRoot: root, responsesClient: fakeProvider, providerConfig: { apiKey: 'x' } })
-expect(providerCalls === 1 && consent.result.mode === 'llm-suggestion' && consent.result.preview.plan.raw[0].links[0] === 'concepts', 'consented provider map was not used safely')
+expect(providerCalls === 1 && providerInput.includes('# Test LLM Wiki principles') && providerInput.includes('Approved PROFILE and CONTEXT') && consent.result.mode === 'llm-suggestion' && consent.result.preview.plan.raw[0].links[0] === 'concepts', 'consented provider did not receive the three approved inputs safely')
 expect(noConsent.result.preview.digest !== consent.result.preview.digest, 'mode-specific preview digest was not bound to its plan')
 const unsafeProvider = { responses: { create: async () => ({ output_text: JSON.stringify({ raw: [{ id: 'music-archive', label: '음악 보관함', purpose: '음악 자료 원본', evidence: proof, links: ['concepts'] }], wiki: [{ id: 'concepts', label: '연구 개념', purpose: '연구 개념 지식', evidence: proof, links: ['reports'] }], output: [{ id: 'reports', label: '조사 보고서', purpose: '조사 보고서 결과', evidence: proof, links: [] }] }) }) } }
 const providerFallback = await startPersonalWikiInit({ memberId: 'researcher', providerApproved: true }, { repoRoot: root, responsesClient: unsafeProvider, providerConfig: { apiKey: 'x' } })
@@ -90,10 +102,10 @@ expect(await readFile(join(backup, 'WIKI_SCHEMA.md'), 'utf8') === 'old schema' &
 
 const priorContext = `${context('연구 논문과 데이터로 실험을 조사하고 조사 보고서를 만든다.')}\n<!-- wiki-operation-rules:start -->\nold managed rules\n<!-- wiki-operation-rules:end -->\n`
 const priorManaged = await fixture('prior-managed', profile('prior-managed', '연구 논문과 데이터로 실험을 조사하고 조사 보고서를 만든다.'), priorContext, { legacyContext: true })
-const priorStart = await startPersonalWikiInit({ memberId: 'prior-managed' }, { repoRoot: root }); expect(priorStart.result.migration.kind === 'legacy-context-bootstrap' && priorStart.result.migration.actions.some(action => action.path === 'CONTEXT.md' && action.action === 'keep'), 'prior CONTEXT was not a compatibility bootstrap')
+const priorStart = await startPersonalWikiInit({ memberId: 'prior-managed' }, { repoRoot: root }); expect(priorStart.result.migration.kind === 'fresh' && !priorStart.result.migration.actions.some(action => action.path === 'CONTEXT.md'), 'CONTEXT was incorrectly treated as a migration target')
 expect(noForbiddenPlanPaths(priorStart.result.preview.files), 'prior-managed migration planned forbidden harness or skill paths')
-const priorApproved = await advancePersonalWikiInit(priorStart.state, { action: 'approve', expectedDigest: priorStart.result.preview.digest, migrationApproved: true }, { repoRoot: root }); await savePersonalWikiInit(priorApproved.state, { action: 'save', expectedDigest: priorStart.result.preview.digest }, { repoRoot: root })
-expect((await readFile(join(priorManaged, 'CONTEXT.md'), 'utf8')) === priorContext && (await readFile(join(priorManaged, 'CLAUDE.md'), 'utf8')).includes('Legacy compatibility projection'), 'compatibility bootstrap changed legacy CONTEXT or did not create CLAUDE')
+const priorApproved = await advancePersonalWikiInit(priorStart.state, { action: 'approve', expectedDigest: priorStart.result.preview.digest }, { repoRoot: root }); await savePersonalWikiInit(priorApproved.state, { action: 'save', expectedDigest: priorStart.result.preview.digest }, { repoRoot: root })
+expect((await readFile(join(priorManaged, 'CONTEXT.md'), 'utf8')) === priorContext && (await readFile(join(priorManaged, 'CLAUDE.md'), 'utf8')).includes('Personal LLM Wiki operations'), 'CONTEXT was changed or root CLAUDE was not generated')
 const malformedMarker = await fixture('malformed-marker', profile('malformed-marker', '연구 논문과 데이터로 실험을 조사하고 조사 보고서를 만든다.'), `${context('연구 논문과 데이터로 실험을 조사하고 조사 보고서를 만든다.')}\n<!-- wiki-operation-rules:end -->\n`)
 await startPersonalWikiInit({ memberId: 'malformed-marker' }, { repoRoot: root }).then(() => fail('malformed managed marker was accepted'), error => expect(error.code === 'migration-required', 'malformed marker did not fail closed'))
 
@@ -115,13 +127,18 @@ const staleStart = await startPersonalWikiInit({ memberId: 'stale' }, { repoRoot
 const staleApproved = await advancePersonalWikiInit(staleStart.state, { action: 'approve', expectedDigest: staleStart.result.preview.digest }, { repoRoot: root })
 await savePersonalWikiInit(staleApproved.state, { action: 'save', expectedDigest: staleStart.result.preview.digest }, { repoRoot: root }).then(() => fail('changed profile must invalidate preview'), error => expect(error.code === 'preview-mismatch', 'profile change did not invalidate preview'))
 expect(await absent(join(stale, 'raw')), 'stale preview left partial writes')
-const claudeStale = await fixture('claude-stale', profile('claude-stale', '연구 논문과 데이터로 실험을 조사하고 조사 보고서를 만든다.'), context('연구 논문과 데이터로 실험을 조사하고 조사 보고서를 만든다.'))
+const contextStale = await fixture('context-stale', profile('context-stale', '연구 논문과 데이터로 실험을 조사하고 조사 보고서를 만든다.'), context('연구 논문과 데이터로 실험을 조사하고 조사 보고서를 만든다.'))
+const contextStaleStart = await startPersonalWikiInit({ memberId: 'context-stale' }, { repoRoot: root }); await writeFile(join(contextStale, 'CONTEXT.md'), context('다른 매 실행 맥락으로 바뀌었다.'))
+const contextStaleApproved = await advancePersonalWikiInit(contextStaleStart.state, { action: 'approve', expectedDigest: contextStaleStart.result.preview.digest }, { repoRoot: root })
+await savePersonalWikiInit(contextStaleApproved.state, { action: 'save', expectedDigest: contextStaleStart.result.preview.digest }, { repoRoot: root }).then(() => fail('changed CONTEXT must invalidate preview'), error => expect(error.code === 'preview-mismatch', 'CONTEXT change did not invalidate preview'))
+expect(await absent(join(contextStale, 'raw')), 'stale CONTEXT preview left partial writes')
+const claudeStale = await fixture('claude-stale', profile('claude-stale', '연구 논문과 데이터로 실험을 조사하고 조사 보고서를 만든다.'), context('연구 논문과 데이터로 실험을 조사하고 조사 보고서를 만든다.'), { existingClaude: '# Existing CLAUDE\n' })
 const claudeStaleStart = await startPersonalWikiInit({ memberId: 'claude-stale' }, { repoRoot: root }); await writeFile(join(claudeStale, 'CLAUDE.md'), `${context('연구 논문과 데이터로 실험을 조사하고 조사 보고서를 만든다.')}\nchanged after preview\n`)
-const claudeStaleApproved = await advancePersonalWikiInit(claudeStaleStart.state, { action: 'approve', expectedDigest: claudeStaleStart.result.preview.digest }, { repoRoot: root })
+const claudeStaleApproved = await advancePersonalWikiInit(claudeStaleStart.state, { action: 'approve', expectedDigest: claudeStaleStart.result.preview.digest, migrationApproved: true }, { repoRoot: root })
 await savePersonalWikiInit(claudeStaleApproved.state, { action: 'save', expectedDigest: claudeStaleStart.result.preview.digest }, { repoRoot: root }).then(() => fail('changed CLAUDE must invalidate preview'), error => expect(error.code === 'preview-mismatch', 'CLAUDE change did not invalidate preview'))
 expect(await absent(join(claudeStale, 'raw')), 'stale CLAUDE preview left partial writes')
 const managedClaude = `${context('연구 논문과 데이터로 실험을 조사하고 조사 보고서를 만든다.')}\n<!-- wiki-operation-rules:start -->\nold rules\n<!-- wiki-operation-rules:end -->\n`
-const managed = await fixture('managed-claude', profile('managed-claude', '연구 논문과 데이터로 실험을 조사하고 조사 보고서를 만든다.'), managedClaude)
+const managed = await fixture('managed-claude', profile('managed-claude', '연구 논문과 데이터로 실험을 조사하고 조사 보고서를 만든다.'), context('연구 논문과 데이터로 실험을 조사하고 조사 보고서를 만든다.'), { existingClaude: managedClaude })
 const managedStart = await startPersonalWikiInit({ memberId: 'managed-claude' }, { repoRoot: root }); expect(managedStart.result.migration.required && managedStart.result.migration.kind === 'managed-rules-update', 'existing managed CLAUDE did not require migration')
 const managedApproved = await advancePersonalWikiInit(managedStart.state, { action: 'approve', expectedDigest: managedStart.result.preview.digest, migrationApproved: true }, { repoRoot: root }); await savePersonalWikiInit(managedApproved.state, { action: 'save', expectedDigest: managedStart.result.preview.digest }, { repoRoot: root })
 expect(await readFile(join(managed, '.wiki-migration-backup', managedStart.result.preview.digest, 'CLAUDE.md'), 'utf8') === managedClaude && (await readFile(join(managed, 'CLAUDE.md'), 'utf8')).startsWith(context('연구 논문과 데이터로 실험을 조사하고 조사 보고서를 만든다.')), 'managed CLAUDE replacement was not backed up or did not preserve prefix')
