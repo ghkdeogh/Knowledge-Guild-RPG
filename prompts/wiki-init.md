@@ -42,7 +42,7 @@ members/{member-id}/
    └─ {evidence-backed-output-type}/
 ```
 
-Use `.gitkeep` only to retain approved empty subfolders. `raw/`, `output/`, PROFILE/CONTEXT and scoped CONTEXT guidance remain excluded from snapshots and public indexing; only public `wiki/` pages are eligible. Do not create `WIKI_INDEX.md`, `ACTIVITY_LOG.md`, `harnesses/*.SKILL.md`, or a generic README scaffold in this flow.
+Use `.gitkeep` only to retain approved empty subfolders. `raw/`, `output/`, and their scoped CONTEXT guidance remain local-only and excluded from Git, snapshots, and public indexing; only public `wiki/` pages are eligible. Do not create `WIKI_INDEX.md`, `ACTIVITY_LOG.md`, `harnesses/*.SKILL.md`, or a generic README scaffold in this flow.
 
 ## Operations in WIKI_SCHEMA.md
 

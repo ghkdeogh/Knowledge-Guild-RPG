@@ -2,6 +2,8 @@ import { access, lstat, mkdir, readFile, symlink, writeFile } from 'node:fs/prom
 import { mkdtemp } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
 import { advancePersonalWikiInit, savePersonalWikiInit, startPersonalWikiInit } from '../server/personal-wiki-initializer.mjs'
 import { classifyWikiPath } from '../core/repository-status.mjs'
 import { loadProfileProviderConfig, parseProfileProviderEnv } from '../server/profile-provider-config.mjs'
@@ -9,6 +11,8 @@ import { loadProfileProviderConfig, parseProfileProviderEnv } from '../server/pr
 const fail = message => { throw new Error(message) }
 const expect = (value, message) => { if (!value) fail(message) }
 const absent = path => access(path).then(() => false).catch(() => true)
+const git = promisify(execFile)
+const gitIgnored = async path => git('git', ['check-ignore', '-q', '--', path], { cwd: join(import.meta.dirname, '..', '..', '..') }).then(() => true).catch(() => false)
 const root = await mkdtemp(join(tmpdir(), 'personal-wiki-init-'))
 await mkdir(join(root, 'prompts'), { recursive: true }); await writeFile(join(root, 'prompts', 'llm-wiki.md'), '# Test LLM Wiki principles\n')
 const fixture = async (id, profile, context) => { const member = join(root, 'members', id); await mkdir(member, { recursive: true }); await writeFile(join(member, 'PROFILE.md'), profile); await writeFile(join(member, 'CONTEXT.md'), context); return member }
@@ -92,5 +96,6 @@ const outside = join(root, 'outside'); await mkdir(outside); const linked = join
 if (await access(linked).then(() => true).catch(() => false)) await startPersonalWikiInit({ memberId: 'linked' }, { repoRoot: root }).then(() => fail('symlink member accepted'), error => expect(error.code === 'unsafe-path', 'symlink did not fail closed'))
 expect(classifyWikiPath('members/researcher/raw/papers/a.md') === null && classifyWikiPath('members/researcher/output/reports/a.md') === null && classifyWikiPath('members/researcher/.wiki-migration-backup/digest/WIKI_SCHEMA.md') === null && classifyWikiPath('members/researcher/wiki/index.md')?.memberId === 'researcher', 'public status allowlist leaked private layers')
 expect(parseProfileProviderEnv('OPENAI_MODEL=x\nEVIL=y').OPENAI_MODEL === 'x' && !(await loadProfileProviderConfig({ env: {}, envPath: join(root, 'missing.env') })).apiKey, 'provider env parsing is unsafe')
+expect(await gitIgnored('members/ignore-check/raw/CONTEXT.md') && await gitIgnored('members/ignore-check/output/CONTEXT.md') && await gitIgnored('members/ignore-check/.wiki-migration-backup/digest/WIKI_SCHEMA.md') && !(await gitIgnored('members/ignore-check/wiki/index.md')) && !(await gitIgnored('members/ignore-check/wiki/log.md')), 'Git ignore boundaries leaked local scoped contexts or backups')
 expect(await readFile(join(root, 'projects', 'private-marker.md'), 'utf8') === 'must remain unread and unchanged' && await readFile(join(spectator, 'PROFILE.md'), 'utf8') === profile('spectator', '창작 참고 자료와 초안을 보관하고 결과물을 만든다.'), 'initializer changed another scope')
 console.log(JSON.stringify({ ok: true, root }))

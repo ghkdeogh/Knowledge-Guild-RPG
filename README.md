@@ -87,7 +87,7 @@ node scripts/release-quickstart.mjs --target <new-absolute-directory-outside-thi
 
 ### 개인화 LLM Wiki 초기화
 
-“위키 초기화해줘”라고 요청하거나 아래 스트리밍 JSONL 명령을 사용하세요. 이 초기화기는 선택한 `members/<member-id>/PROFILE.md`, `CONTEXT.md`, 그리고 `prompts/llm-wiki.md`의 원칙만 바탕으로, 근거가 있는 `raw → wiki → output` 구조를 제안합니다. `raw/`와 `output/`은 로컬 전용이고 `wiki/`의 공개 페이지들만 snapshot 대상입니다. 미리보기와 digest 승인 전에는 파일을 쓰지 않으며, 근거가 부족하면 한 번만 보충 질문을 하거나 중단합니다.
+“위키 초기화해줘”라고 요청하거나 아래 스트리밍 JSONL 명령을 사용하세요. 이 초기화기는 선택한 `members/<member-id>/PROFILE.md`, `CONTEXT.md`, 그리고 `prompts/llm-wiki.md`의 원칙만 바탕으로, 근거가 있는 `raw → wiki → output` 구조를 제안합니다. `raw/`와 `output/` 및 그 안의 scoped `CONTEXT.md`는 로컬 전용이고 `wiki/`의 공개 페이지들만 snapshot 대상입니다. 미리보기와 digest 승인 전에는 파일을 쓰지 않으며, 근거가 부족하면 한 번만 보충 질문을 하거나 중단합니다.
 
 ```powershell
 @'
