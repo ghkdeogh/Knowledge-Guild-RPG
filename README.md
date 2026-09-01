@@ -1,40 +1,44 @@
 # Knowledge Guild RPG
 
-개인의 자료를 `raw → wiki → output`으로 쌓는 로컬 우선 LLM Wiki입니다. CLI가 승인된 계획만 파일로 만들고, 웹 UI는 공개 Wiki 상태를 읽기 전용으로 보여 줍니다.
+개인의 자료를 `raw → wiki → output`으로 쌓는 로컬 우선 LLM Wiki입니다. CLI agent가 승인된 계획만 파일로 만들고, 웹 UI는 공개 Wiki 상태를 읽기 전용으로 보여 줍니다.
+
+![Knowledge Guild RPG UI 예시](docs/images/knowledge-guild-village.png)
+
+*실제 앱 UI 예시입니다. 캐릭터는 개인이나 실제 사람을 뜻하지 않습니다.*
 
 ## 3단계 시작
 
 Node.js 18.20 이상이 필요합니다.
 
-1. 설치합니다.
+1. 이 저장소 root를 Codex, Claude Code, OpenCode 같은 CLI agent로 엽니다. 앱 의존성은 한 번만 설치합니다.
 
    ```sh
    cd apps/wiki-village
    npm ci
    ```
 
-2. 터미널에서 프로필 온보딩을 시작합니다.
+2. agent와 자연어로 온보딩합니다. 이름을 알려 준 뒤 정확히 세 주제의 질문에 한 번에 하나씩 답하고, `PROFILE.md + CONTEXT.md` preview를 확인·승인합니다.
 
-   ```sh
-   npm run profile-onboarding
-   ```
+3. 같은 agent에게 Wiki 초기화와 UI 실행을 요청합니다. 구조/`CLAUDE.md` preview를 확인·승인한 뒤 브라우저를 엽니다.
 
-   실행 후 `{"action":"start"}`를 한 줄로 보내고, CLI가 출력하는 질문에 JSON 한 줄씩 응답하세요. 승인 전에는 파일을 만들지 않습니다. 승인하면 선택한 member의 상세 `PROFILE.md`와 간결한 `CONTEXT.md`가 로컬에 생성됩니다.
+복사해 시작할 수 있는 짧은 대화 예시입니다.
 
-3. 같은 member의 개인 Wiki를 초기화한 뒤 UI를 실행합니다.
+```text
+나: 온보딩 시작해줘
+나: [이름과 세 질문에 차례로 답변]
+나: preview를 확인했어. 승인해줘
+나: 위키 초기화해줘
+나: Wiki 구조와 CLAUDE preview를 확인했어. 승인해줘
+나: UI 실행해줘
+```
 
-   ```sh
-   npm run personal-wiki-init
-   npm run dev
-   ```
-
-   초기화 CLI에 `{"action":"start","memberId":"<member-id>"}`를 보내 preview와 digest를 확인하고 승인하세요. 브라우저는 터미널에 표시된 `http://localhost:5173`에서 엽니다. UI는 읽기 전용입니다.
+UI는 `http://localhost:5173`에서 확인합니다. agent 대신 직접 실행하려면 `apps/wiki-village`에서 `npm run dev`를 사용하세요.
 
 ## 정상 흐름
 
-1. 온보딩은 `PROFILE.md`와 `CONTEXT.md`를 만듭니다.
-2. Wiki 초기화는 그 두 파일과 [`prompts/llm-wiki.md`](prompts/llm-wiki.md)를 읽어 목적에 맞는 구조를 제안합니다.
-3. 승인 후 새 `CLAUDE.md` 운영 계약, `raw/`, `wiki/`, lowercase `output/`, `WIKI_SCHEMA.md`, `wiki/index.md`, `wiki/log.md`를 만듭니다.
+1. `온보딩 시작해줘` → 이름과 정확히 세 주제 인터뷰 → `PROFILE.md + CONTEXT.md` preview 승인
+2. `위키 초기화해줘` → `PROFILE.md + CONTEXT.md`와 [`prompts/llm-wiki.md`](prompts/llm-wiki.md) 기반 구조/`CLAUDE.md` preview 승인
+3. `UI 실행해줘` 또는 `npm run dev` → 읽기 전용 UI 확인
 
 `raw/`는 불변 원본, `wiki/`는 LLM이 컴파일·연결하는 지식, `output/`은 Wiki 근거에서 만든 결과물입니다. 실제 하위 폴더는 프로필과 맥락의 근거가 있을 때만 제안됩니다. `WIKI_INDEX.md`, `ACTIVITY_LOG.md`, `harnesses/`, `*.SKILL.md`는 이 개인 초기화 흐름에서 만들지 않습니다.
 
@@ -51,7 +55,7 @@ npm run test:personal-wiki-init
 npm run test:profile-onboarding
 ```
 
-전체 로컬 검증은 `npm run test:snapshot`, `npm run test:repository`, `npm run test:chat`, `npm run test:layout`과 `npm run build`로 실행할 수 있습니다.
+`profile-onboarding`과 `personal-wiki-init`은 JSONL 자동화용 headless CLI입니다. 평소에는 위의 agent 대화를 사용하세요. 전체 로컬 검증은 `npm run test:snapshot`, `npm run test:repository`, `npm run test:chat`, `npm run test:layout`과 `npm run build`로 실행할 수 있습니다.
 
 ## 생성 구조
 
