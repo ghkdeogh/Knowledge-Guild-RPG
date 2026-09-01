@@ -22,17 +22,10 @@ node_modules/
 __pycache__/
 *.py[cod]
 
-# Personal raw sources stay local. Keep only structure documentation in Git.
-members/*/raw/**
-!members/*/raw/**/
-!members/*/raw/**/README.md
-!members/*/raw/**/.gitkeep
-
-# Personal outputs stay local. Keep only structure documentation in Git.
-members/*/output/**
-!members/*/output/**/
-!members/*/output/**/README.md
-!members/*/output/**/.gitkeep
+# Every member's personal Wiki is local-only. Keep just this repository guide.
+members/**
+!members/
+!members/README.md
 
 # Project raw sources and generated outputs follow the same local-only boundary.
 projects/raw/**
@@ -52,6 +45,12 @@ members/*/secrets/**
 members/*/PROFILE.private.md
 members/*/CONTEXT.private.md
 members/*/.wiki-migration-backup/
+
+# Local BMAD runtime, outputs, and agent-tool state are never repository content.
+_bmad/
+_bmad-output/
+.agents/skills/bmad-*/
+.claude/
 .vercel
 .env*
 !.env.example
