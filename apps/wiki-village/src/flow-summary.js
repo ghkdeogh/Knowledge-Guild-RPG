@@ -1,6 +1,7 @@
 export const publicSource = source => {
   if (typeof source !== 'string' || source.includes('\\') || source.startsWith('/') || source.includes(':')) return false
   const parts = source.split('/'); if (parts.some(part => !part || part === '.' || part === '..')) return false
+  if (parts.at(-1)?.toLowerCase() === 'claude.md') return false
   return (parts[0] === 'projects' && parts[1] === 'wiki') || (parts[0] === 'members' && /^[a-z0-9-]+$/.test(parts[1] || '') && parts[2] === 'wiki')
 }
 const validDate = value => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z)?$/.test(value) ? value : null

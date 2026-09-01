@@ -2,7 +2,7 @@
   "version": 7,
   "projectState": "FLOW_UNINITIALIZED",
   "generatedAt": null,
-  "boundary": "WIKI SNAPSHOT · projects/wiki and members/<id>/wiki only · no context/raw/output/private/secrets",
+  "boundary": "WIKI SNAPSHOT · projects/wiki and members/<id>/wiki only · no CONTEXT/CLAUDE/raw/output/private/secrets",
   "decisionState": "Official decisions exist only in decisions/ after explicit approval; flow is an observation, not a decision.",
   "manifest": {
     "version": 1,

@@ -18,7 +18,7 @@
 - 정확한 전체 파일 계획과 digest
 - 근거가 부족하여 만들지 않은 영역
 
-사용자는 digest를 명시적으로 승인해야 한다. `CONTEXT.md`에 이미 관리되는 `Wiki 운영 규칙` 블록이 있거나 이전 Wiki 구조가 있으면 keep/add/replace/remove migration diff를 먼저 제안한다. 별도의 migration 승인 뒤에도 preview에 선언된 `WIKI_SCHEMA.md`, `wiki/index.md`, 관리 규칙 블록만 교체할 수 있으며, 기존 원본은 `.wiki-migration-backup/<digest>/`에 복구 가능하게 보관한다. 기존 원본, 다른 wiki 페이지, `WIKI_INDEX.md`, `ACTIVITY_LOG.md`, harness를 자동 삭제·이동·덮어쓰지 않는다.
+사용자는 digest를 명시적으로 승인해야 한다. 이전 Wiki 구조나 이전 CONTEXT-managed 운영 marker 블록이 있으면 keep/add/replace/remove migration diff를 먼저 제안한다. 별도의 migration 승인 뒤에도 preview에 선언된 root/scoped `CLAUDE.md`, `WIKI_SCHEMA.md`, `wiki/index.md`만 교체할 수 있으며, 이전 marker 블록은 `CONTEXT.md`의 marker 밖 byte를 보존한 채 제거할 수 있다. 기존 원본은 `.wiki-migration-backup/<digest>/`에 복구 가능하게 보관한다. 기존 원본, 다른 wiki 페이지, `WIKI_INDEX.md`, `ACTIVITY_LOG.md`, harness를 자동 삭제·이동·덮어쓰지 않으며, 이 legacy 항목은 unmanaged로 표시한다.
 
 ## Approved fresh structure
 
@@ -27,25 +27,27 @@
 ```text
 members/{member-id}/
 ├─ PROFILE.md                         # unchanged
-├─ CONTEXT.md                         # existing bytes preserved; managed rules block appended
+├─ CONTEXT.md                         # preserved personal profile context
+├─ CLAUDE.md                          # cross-agent operational contract
 ├─ WIKI_SCHEMA.md                     # provider-neutral, personalized exact tree/schema
 ├─ raw/
-│  ├─ CONTEXT.md                      # immutable source guidance
+│  ├─ CLAUDE.md                       # immutable source contract (local-only)
 │  └─ {evidence-backed-input-type}/
 ├─ wiki/
-│  ├─ CONTEXT.md                      # compiled knowledge guidance
+│  ├─ CLAUDE.md                       # compiled knowledge contract (not indexed)
 │  ├─ index.md
 │  ├─ log.md
 │  └─ {evidence-backed-knowledge-area}/
 └─ output/
-   ├─ CONTEXT.md                      # result guidance
+   ├─ CLAUDE.md                       # result contract (local-only)
    └─ {evidence-backed-output-type}/
 ```
 
-Use `.gitkeep` only to retain approved empty subfolders. `raw/`, `output/`, and their scoped CONTEXT guidance remain local-only and excluded from Git, snapshots, and public indexing; only public `wiki/` pages are eligible. Do not create `WIKI_INDEX.md`, `ACTIVITY_LOG.md`, `harnesses/*.SKILL.md`, or a generic README scaffold in this flow.
+Use `.gitkeep` only to retain approved empty subfolders. `raw/`, `output/`, and their scoped CLAUDE contracts remain local-only and excluded from Git, snapshots, and public indexing; `wiki/CLAUDE.md` is also never public knowledge. `CLAUDE.md` is a cross-agent operational contract despite its familiar filename. Do not create `WIKI_INDEX.md`, `ACTIVITY_LOG.md`, `harnesses/`, `*.SKILL.md`, or a generic README scaffold in this flow.
 
-## Operations in WIKI_SCHEMA.md
+## Operations in CLAUDE.md
 
+- `WIKI_SCHEMA.md`는 정확한 tree와 mapping만 담는 machine-readable companion이다. 운영 규칙은 root/scoped `CLAUDE.md`를 따른다.
 - Raw sources are immutable and are the source of truth.
 - An ingest compiles one source into interlinked Wiki pages, updates `wiki/index.md`, and appends `wiki/log.md`.
 - A query reads the index first and files a durable result only with approval.

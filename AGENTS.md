@@ -2,4 +2,4 @@
 
 Start with `WIKI_RULES.md`. Personal material lives only in `members/{member-id}/`; do not read or edit another member space unless the user explicitly asks to compare it. Keep project facts in `projects/`, drafts in `synthesis/`, and explicit agreements in `decisions/`.
 
-Use `member-id` (lowercase letters, numbers, hyphens) as the stable identity. Personal opinions, hypotheses, common facts, synthesis drafts, and official decisions must remain separate.
+Use `member-id` (lowercase letters, numbers, hyphens) as the stable identity. Before personal Wiki work, read that member's `PROFILE.md`, `CONTEXT.md`, `WIKI_SCHEMA.md`, and `CLAUDE.md` when present. When operating in `raw/`, `wiki/`, or `output/`, also read that layer's scoped `CLAUDE.md` when present. Member `CLAUDE.md` files are cross-agent operational contracts; they supplement this repository guide and never replace it. Personal opinions, hypotheses, common facts, synthesis drafts, and official decisions must remain separate.

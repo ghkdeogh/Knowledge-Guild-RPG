@@ -19,6 +19,7 @@ const many = buildFlowSummary([
 ])
 expect(many.commonGround.length === 0 && many.differingViews.length === 1 && many.knowledgeGaps.length >= 1 && many.evidencePaths.every(path => !path.includes('CONTEXT')), 'Flow summary mixed unsafe paths or failed to separate explicit shared and contrasting stances')
 expect(!isValidFlowSummary({ ...many, evidencePaths: ['members/atlas/CONTEXT.md'] }), 'Invalid private flow evidence was accepted')
+expect(!isValidFlowSummary({ ...many, evidencePaths: ['members/atlas/wiki/CLAUDE.md'] }), 'Operational CLAUDE evidence was accepted')
 expect(!isValidFlowSummary({ version: 1, status: 'observed', observedFlow: 'fabricated', frequentTopics: [], recentDirections: [], commonGround: [], differingViews: [], knowledgeGaps: [], nextResearchQuestions: [], evidencePaths: [], lastUpdatedAt: null }), 'Observed flow without evidence was accepted')
 expect(!isValidFlowSummary({ ...many, differingViews: [{ topic: 'release evidence', evidencePaths: many.evidencePaths }] }), 'Malformed differing-view detail was accepted')
 const builder = await readFile(resolve(appRoot, 'scripts/build-wiki-snapshot.mjs'), 'utf8'); expect(builder.includes("join(repoRoot, 'projects', 'wiki')") && builder.includes("join(membersRoot, memberId, 'wiki')") && !builder.includes('parseMemberContext') && !builder.includes('PROJECT_CONTEXT.md') && !builder.includes('WIKI_SCHEMA.md'), 'Snapshot builder reads outside public Wiki boundaries')

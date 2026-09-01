@@ -87,7 +87,7 @@ node scripts/release-quickstart.mjs --target <new-absolute-directory-outside-thi
 
 ### 개인화 LLM Wiki 초기화
 
-“위키 초기화해줘”라고 요청하거나 아래 스트리밍 JSONL 명령을 사용하세요. 이 초기화기는 선택한 `members/<member-id>/PROFILE.md`, `CONTEXT.md`, 그리고 `prompts/llm-wiki.md`의 원칙만 바탕으로, 근거가 있는 `raw → wiki → output` 구조를 제안합니다. `raw/`와 `output/` 및 그 안의 scoped `CONTEXT.md`는 로컬 전용이고 `wiki/`의 공개 페이지들만 snapshot 대상입니다. 미리보기와 digest 승인 전에는 파일을 쓰지 않으며, 근거가 부족하면 한 번만 보충 질문을 하거나 중단합니다.
+“위키 초기화해줘”라고 요청하거나 아래 스트리밍 JSONL 명령을 사용하세요. 이 초기화기는 선택한 `members/<member-id>/PROFILE.md`, `CONTEXT.md`, 그리고 `prompts/llm-wiki.md`의 원칙만 바탕으로, 근거가 있는 `raw → wiki → output` 구조를 제안합니다. PROFILE.md와 CONTEXT.md는 fresh init에서 byte-identical로 보존합니다. member와 각 계층의 `CLAUDE.md`는 Codex를 포함한 모든 agent가 읽는 cross-agent 운영 계약입니다. `raw/`와 `output/` 및 그 안의 `CLAUDE.md`는 로컬 전용이고, `wiki/CLAUDE.md`도 공개 지식이 아닌 운영 설정이며 snapshot 대상이 아닙니다.
 
 ```powershell
 @'
@@ -95,7 +95,7 @@ node scripts/release-quickstart.mjs --target <new-absolute-directory-outside-thi
 '@ | node scripts/personal-wiki-init-cli.mjs
 ```
 
-preview 후 같은 세션에서 `{"action":"approve","expectedDigest":"<digest>"}`와 별도 `save`를 보냅니다. PROFILE/CONTEXT를 OpenAI Responses 제공자에 보낼 수 있는 경우에만 시작 요청에 `"providerApproved":true`를 넣으세요. 기존 scaffold나 개인 구조가 있으면 keep/add/replace migration diff를 먼저 보여 줍니다. `migrationApproved:true`로 승인하면 preview에 선언된 `WIKI_SCHEMA.md`·`wiki/index.md`·관리 규칙 블록만 recoverable backup과 함께 교체하고, 나머지는 추가만 합니다. `WIKI_INDEX.md`, `ACTIVITY_LOG.md`, harness, raw/wiki/output 사용자 내용은 삭제·이동하지 않습니다. 기존 `wiki-architect`의 personal `preview/save`는 더 이상 사용할 수 없으며 프로필 뒤 기본 초기화 경로는 personal initializer입니다.
+preview 후 같은 세션에서 `{"action":"approve","expectedDigest":"<digest>"}`와 별도 `save`를 보냅니다. PROFILE/CONTEXT를 OpenAI Responses 제공자에 보낼 수 있는 경우에만 시작 요청에 `"providerApproved":true`를 넣으세요. 기존 scaffold나 개인 구조가 있으면 keep/add/replace migration diff를 먼저 보여 줍니다. `migrationApproved:true`로 승인하면 preview에 선언된 `CLAUDE.md`·`WIKI_SCHEMA.md`·`wiki/index.md`만 recoverable backup과 함께 교체합니다. 이전 CONTEXT-managed 구현의 명시적 marker 블록은 이 승인 migration에서만 제거하며, marker 밖의 byte는 보존합니다. fresh init은 `CONTEXT.md`를 전혀 변경하지 않습니다. `WIKI_INDEX.md`, `ACTIVITY_LOG.md`, harness, raw/wiki/output 사용자 내용은 legacy/unmanaged로 남기며 삭제·이동하지 않습니다. 기존 `wiki-architect`의 personal `preview/save`는 더 이상 사용할 수 없으며 프로필 뒤 기본 초기화 경로는 personal initializer입니다.
 
 ## CLI 사용법
 
@@ -170,11 +170,12 @@ printf '%s\n' '{}' | node scripts/wiki-architect-cli.mjs --command status
 
 ```text
 members/<member-id>/       # profile-first personalized initializer가 만드는 personal Wiki
-  PROFILE.md · CONTEXT.md  # CONTEXT에는 관리되는 Wiki 운영 규칙 블록만 append
-  WIKI_SCHEMA.md           # 실제 개인화 raw → wiki → output 구조와 운영 규칙
-  raw/CONTEXT.md           # immutable source 계층의 scoped guidance
-  wiki/CONTEXT.md · index.md · log.md
-  output/CONTEXT.md        # 결과물 계층의 scoped guidance
+  PROFILE.md · CONTEXT.md  # profile context; unchanged by fresh Wiki init
+  CLAUDE.md                # cross-agent operational contract
+  WIKI_SCHEMA.md           # 실제 개인화 raw → wiki → output 구조와 mapping
+  raw/CLAUDE.md            # immutable source 계층의 local contract
+  wiki/CLAUDE.md · index.md · log.md
+  output/CLAUDE.md         # local output contract
 
 projects/                  # explicit preview-workspace/save-workspace에서만 생성
   PROJECT_CONTEXT.md       # 승인된 공통 brief
@@ -187,7 +188,7 @@ projects/                  # explicit preview-workspace/save-workspace에서만 
 
 ## 캐릭터와 길드 UI가 뜻하는 것
 
-중앙 **프로젝트 길드홀**은 `projects/wiki/**`와 `members/{member-id}/wiki/**`의 공개 기록에서 도출한 현재 관찰 흐름만 나타냅니다. 각 **캐릭터와 집**은 오직 해당 `members/{member-id}/wiki/**`의 공개 개인 Wiki 범위만 나타냅니다. `CONTEXT.md`와 `WIKI_SCHEMA.md`는 로컬 설정이며 snapshot, evidence, citation source가 아닙니다. 개인 관점은 자동으로 공통 사실·팀 합의·공식 결정이 되지 않습니다.
+중앙 **프로젝트 길드홀**은 `projects/wiki/**`와 `members/{member-id}/wiki/**`의 공개 기록에서 도출한 현재 관찰 흐름만 나타냅니다. 각 **캐릭터와 집**은 오직 해당 `members/{member-id}/wiki/**`의 공개 개인 Wiki 범위만 나타냅니다. `CONTEXT.md`, `WIKI_SCHEMA.md`, 그리고 모든 member/layer `CLAUDE.md`는 운영 설정이며 snapshot, evidence, citation source가 아닙니다. 개인 관점은 자동으로 공통 사실·팀 합의·공식 결정이 되지 않습니다.
 
 관찰 흐름은 규칙 기반 fallback으로도 생성되며 공식 목표나 결정이 아닙니다. `decisions/`에 명시적으로 승인된 내용만 공식 결정입니다. 기록이 없거나 주제가 충분하지 않으면 UI는 `판단할 기록이 부족합니다`라고 표시하며, 기록 부재를 동의·반대로 해석하지 않습니다. `npm run snapshot`(또는 build)이 flow snapshot을 갱신하고, UI의 **저장소 상태 새로고침**은 공개 Git 경로 metadata만 수동 확인할 뿐 snapshot을 다시 만들지 않습니다.
 
@@ -195,7 +196,7 @@ projects/                  # explicit preview-workspace/save-workspace에서만 
 
 ## 보안과 데이터 경계
 
-- 공개 snapshot·evidence·citation 대상은 `projects/wiki/**`와 `members/{member-id}/wiki/**`뿐입니다. `PROJECT_CONTEXT.md`, `WIKI_BLUEPRINT.md`, member의 `CONTEXT.md`, `WIKI_SCHEMA.md`, `raw/`, `output/`, private profile/context, secrets는 그 대상이 아닙니다.
+- 공개 snapshot·evidence·citation 대상은 `projects/wiki/**`와 `members/{member-id}/wiki/**`뿐입니다. `PROJECT_CONTEXT.md`, `WIKI_BLUEPRINT.md`, member의 `CONTEXT.md`, `WIKI_SCHEMA.md`, 모든 member/layer `CLAUDE.md`, `raw/`, `output/`, private profile/context, secrets는 그 대상이 아닙니다.
 - `.env`, API 키, project/member raw·output·private·secrets는 커밋하지 않습니다. `.gitignore`는 이 로컬 경계를 보호합니다.
 - 사용자의 원문, AI 제안, 승인된 blueprint를 구분합니다. 승인 전에는 canonical 파일을 만들지 않습니다.
 - CLI의 local writable mode만 실제 repository 쓰기를 수행합니다. Vercel 같은 read-only 배포는 preview/export 화면일 뿐, 저장됐다고 말하지 않습니다.
