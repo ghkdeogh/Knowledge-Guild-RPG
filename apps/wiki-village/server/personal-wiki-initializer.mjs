@@ -22,7 +22,7 @@ const memberRoot = (repoRoot, memberId) => {
 }
 async function safeExistingMember(repoRoot, memberId) {
   const paths = memberRoot(repoRoot, memberId)
-  if (!(await exists(paths.target))) fail('선택한 member의 PROFILE.md와 CONTEXT.md가 필요합니다.', 'profile-missing', 404)
+  if (!(await exists(paths.target))) fail('선택한 member의 PROFILE.md가 필요합니다.', 'profile-missing', 404)
   if ((await lstat(paths.members)).isSymbolicLink() || (await lstat(paths.target)).isSymbolicLink()) fail('심볼릭 링크 member 공간은 사용할 수 없습니다.', 'unsafe-path')
   const [actualMembers, actualTarget] = await Promise.all([realpath(paths.members), realpath(paths.target)])
   if (actualTarget !== resolve(actualMembers, memberId)) fail('선택한 member 공간 밖에는 접근할 수 없습니다.', 'unsafe-path')
@@ -30,29 +30,21 @@ async function safeExistingMember(repoRoot, memberId) {
 }
 async function readInputs(repoRoot, memberId) {
   const scope = await safeExistingMember(repoRoot, memberId)
-  const profilePath = join(scope.target, 'PROFILE.md'); const contextPath = join(scope.target, 'CONTEXT.md')
-  for (const path of [profilePath, contextPath]) {
-    if (!(await exists(path)) || !(await lstat(path)).isFile()) fail('PROFILE.md와 CONTEXT.md가 모두 필요합니다.', 'profile-missing', 404)
-    const resolved = await realpath(path); if (!resolved.startsWith(`${scope.actualTarget}${sep}`)) fail('선택한 member 공간 밖에는 접근할 수 없습니다.', 'unsafe-path')
-  }
+  const profilePath = join(scope.target, 'PROFILE.md'); const claudePath = join(scope.target, 'CLAUDE.md'); const contextPath = join(scope.target, 'CONTEXT.md')
+  if (!(await exists(profilePath)) || !(await lstat(profilePath)).isFile()) fail('PROFILE.md가 필요합니다.', 'profile-missing', 404)
+  const safeFile = async path => { if (!(await exists(path))) return null; if (!(await lstat(path)).isFile()) fail('개인 context 파일은 일반 파일이어야 합니다.', 'unsafe-path'); const resolved = await realpath(path); if (!resolved.startsWith(`${scope.actualTarget}${sep}`)) fail('선택한 member 공간 밖에는 접근할 수 없습니다.', 'unsafe-path'); return readFile(path, 'utf8') }
   const principlesPath = resolve(scope.root, 'prompts', 'llm-wiki.md')
   if (!principlesPath.startsWith(`${scope.root}${sep}`)) fail('허용되지 않은 초기화 지침 경로입니다.', 'unsafe-path')
-  const [profile, context, principles] = await Promise.all([readFile(profilePath, 'utf8'), readFile(contextPath, 'utf8'), readFile(principlesPath, 'utf8')])
+  const [profile, claude, context, principles] = await Promise.all([safeFile(profilePath), safeFile(claudePath), safeFile(contextPath), readFile(principlesPath, 'utf8')])
   if (!principles.trim()) fail('LLM Wiki 운영 원칙을 읽을 수 없습니다.', 'prompt-missing')
-  if (Buffer.byteLength(profile) + Buffer.byteLength(context) > 128000) fail('PROFILE.md와 CONTEXT.md가 안전한 초기화 한도를 초과합니다.', 'input-too-large')
-  return { scope, profile, context, principles, profileDigest: contentDigest(profile), contextDigest: contentDigest(context) }
+  if (!claude && !context) return { scope, profile, principles, inputMissing: true, profileDigest: contentDigest(profile) }
+  const primary = claude || context
+  if (Buffer.byteLength(profile) + Buffer.byteLength(primary) > 128000) fail('PROFILE.md와 개인 context가 안전한 초기화 한도를 초과합니다.', 'input-too-large')
+  return { scope, profile, claude, context, primary, primaryKind: claude ? 'CLAUDE' : 'CONTEXT-compatibility', compatibilityBootstrap: !claude, principles, profileDigest: contentDigest(profile), primaryDigest: contentDigest(primary), legacyContextDigest: !claude && context ? contentDigest(context) : null }
 }
-const evidenceRefs = text => {
-  const refs = []; let document = 'PROFILE';
-  for (const line of text.split(/\r?\n/)) {
-    if (/^#\s/.test(line)) document = line.includes('Context') ? 'CONTEXT' : 'PROFILE'
-    if (/^#{1,3}\s+/.test(line)) refs.push(`${document}:${line.replace(/^#+\s+/, '').slice(0, 50)}`)
-  }
-  return [...new Set(refs)]
-}
-function evidenceSections(profile, context) {
+function evidenceSections(profile, personal, personalDocument = 'CLAUDE') {
   const sections = new Map()
-  for (const [document, text] of [['PROFILE', profile], ['CONTEXT', context]]) {
+  for (const [document, text] of [['PROFILE', profile], [personalDocument, personal]]) {
     let ref = `${document}:document`; let body = []
     const flush = () => { if (body.length) sections.set(ref, body.join('\n')) }
     for (const line of text.split(/\r?\n/)) {
@@ -79,8 +71,8 @@ function linkPlan(plan) {
   for (const [index, knowledge] of plan.wiki.entries()) knowledge.links = plan.output.length ? [plan.output[index % plan.output.length].id] : []
   return plan
 }
-function offlinePlan(profile, context) {
-  const text = `${profile}\n${context}`.toLowerCase(); const refs = evidenceRefs(`${profile}\n${context}`); const matched = defs.filter(def => has(text, def.terms));
+function offlinePlan(profile, personal, personalDocument = 'CLAUDE') {
+  const text = `${profile}\n${personal}`.toLowerCase(); const refs = [...evidenceSections(profile, personal, personalDocument).keys()]; const matched = defs.filter(def => has(text, def.terms));
   const raw = []; const wiki = []; const output = []
   for (const def of matched) { for (const [id, purpose] of def.raw) raw.push(item(id, purpose, refs, [`${id}-source.md`])); for (const [id, purpose] of def.wiki) wiki.push(item(id, purpose, refs, [`${id}-overview.md`])); for (const [id, purpose] of def.output) output.push(item(id, purpose, refs, [`${id}-brief.md`])) }
   for (const [id, terms] of sourceSignals) if (has(text, terms)) raw.push(item(id, `${label(id)} 형태의 원본을 불변으로 보관`, refs, [`${id}-source.md`]))
@@ -111,38 +103,39 @@ function validateProviderPlan(value, sections) {
   for (const layer of ['raw', 'wiki', 'output']) for (const candidate of result[layer]) if (candidate.links.some(link => !validTargets[layer].has(link))) fail('제공자 mapping link가 유효하지 않습니다.', 'malformed-response')
   return result
 }
-async function proposedPlan(profile, context, principles, options) {
-  const local = offlinePlan(profile, context)
+async function proposedPlan(profile, personal, personalDocument, principles, options) {
+  const local = offlinePlan(profile, personal, personalDocument)
   if (!options.providerApproved) return { ...local, mode: 'offline-conservative', providerStatus: 'not-consented' }
   if (!options.providerConfig?.apiKey && !options.responsesClient) return { ...local, mode: 'offline-conservative', providerStatus: 'not-configured' }
   try {
     const client = options.responsesClient || new (await import('openai')).default({ apiKey: options.providerConfig.apiKey })
-    const sections = evidenceSections(profile, context); const refs = [...sections.keys()]; const response = await client.responses.create({ model: options.providerConfig?.model || 'gpt-5.6-terra', store: false, ...(options.providerConfig?.reasoningEffort ? { reasoning: { effort: options.providerConfig.reasoningEffort } } : {}), instructions: 'Return only JSON. Design a conservative personal LLM Wiki map. Use lowercase ASCII directory ids. For every folder item give a bounded exact evidence span (4-160 chars) and its section ref; the label and purpose must each use terms in that span. Do not infer unsupported folders. Evidence spans validate the response and will never be persisted.', input: `LLM Wiki operating principles:\n${principles}\n\nAllowed evidence references: ${refs.join(', ')}\nApproved PROFILE and CONTEXT (consent obtained):\n${profile}\n\n${context}`, text: { format: { type: 'json_schema', name: 'personal_wiki_map', strict: true, schema: providerSchema } } })
+    const sections = evidenceSections(profile, personal, personalDocument); const refs = [...sections.keys()]; const response = await client.responses.create({ model: options.providerConfig?.model || 'gpt-5.6-terra', store: false, ...(options.providerConfig?.reasoningEffort ? { reasoning: { effort: options.providerConfig.reasoningEffort } } : {}), instructions: 'Return only JSON. Design a conservative personal LLM Wiki map. Use lowercase ASCII directory ids. For every folder item give a bounded exact evidence span (4-160 chars) and its section ref; the label and purpose must each use terms in that span. Do not infer unsupported folders. Evidence spans validate the response and will never be persisted.', input: `LLM Wiki operating principles:\n${principles}\n\nAllowed evidence references: ${refs.join(', ')}\nApproved PROFILE and ${personalDocument} (consent obtained):\n${profile}\n\n${personal}`, text: { format: { type: 'json_schema', name: 'personal_wiki_map', strict: true, schema: providerSchema } } })
     const plan = validateProviderPlan(JSON.parse(response.output_text || '{}'), sections); return { plan, clarification: null, mode: 'llm-suggestion', providerStatus: 'used' }
   } catch (error) { return { ...local, mode: 'offline-conservative', providerStatus: error.code === 'malformed-response' ? 'malformed-response' : 'unavailable' } }
 }
 function removeLegacyRules(context) { const start = context.indexOf(managedStart); const end = context.indexOf(managedEnd); if (start < 0 && end < 0) return context; if (start < 0 || end < start || context.indexOf(managedStart, start + managedStart.length) >= 0 || context.indexOf(managedEnd, end + managedEnd.length) >= 0) fail('기존 Wiki 운영 규칙 block이 하나의 완전한 marker 쌍이 아닙니다.', 'migration-required'); return `${context.slice(0, start)}${context.slice(end + managedEnd.length)}` }
+function operationsBlock(plan) { return `${managedStart}\n\n## Personal LLM Wiki operations\n\n- raw/ is immutable source of truth; read raw/CLAUDE.md before ingest.\n- Ingest compiles one source into linked wiki pages, updates wiki/index.md, and appends wiki/log.md.\n- Query reads wiki/index.md first and writes a durable result only with approval.\n- Lint identifies contradictions, staleness, orphaned pages, missing links, and knowledge gaps.\n- Read the scoped CLAUDE.md before operating each layer; label facts, personal opinions, hypotheses, and AI inferences.\n- Never create harnesses/, *.SKILL.md, WIKI_INDEX.md, or ACTIVITY_LOG.md in this personal Wiki.\n\nCurrent selected areas: raw(${plan.raw.map(x => x.id).join(', ')}), wiki(${plan.wiki.map(x => x.id).join(', ')}), output(${plan.output.map(x => x.id).join(', ')}).\n\n${managedEnd}\n` }
+function claudeWithRules(claude, plan) { const start = claude.indexOf(managedStart); const end = claude.indexOf(managedEnd); if (start < 0 && end < 0) return `${claude}${claude.endsWith('\n') ? '\n' : '\n\n'}${operationsBlock(plan)}`; if (start < 0 || end < start || claude.indexOf(managedStart, start + managedStart.length) >= 0 || claude.indexOf(managedEnd, end + managedEnd.length) >= 0) fail('기존 Wiki 운영 규칙 block이 하나의 완전한 marker 쌍이 아닙니다.', 'migration-required'); return `${claude.slice(0, start)}${operationsBlock(plan)}${claude.slice(end + managedEnd.length)}` }
+function bootstrapClaude(context, plan) { const personal = `# Personal AI Context\n\n> Compatibility bootstrap from legacy CONTEXT.md. PROFILE.md and this CLAUDE.md are canonical going forward; the legacy CONTEXT.md remains unchanged.\n\n## 나는 누구인가\n\n- Refer to PROFILE.md and the preserved compatibility projection below.\n\n## 나의 역할들\n\n- Refer to PROFILE.md and the preserved compatibility projection below.\n\n## 나의 비전과 목표\n\n- Refer to PROFILE.md and the preserved compatibility projection below.\n\n## AI에게 기대하는 것\n\n- Refer to PROFILE.md and the preserved compatibility projection below.\n\n## 작업 규칙\n\n- Preserve scope boundaries and seek approval before writes.\n\n## Legacy compatibility projection\n\n${context}`; return `${personal}${personal.endsWith('\n') ? '\n' : '\n\n'}${operationsBlock(plan)}` }
 function folderClaude(layer, entries) { const mutability = layer === 'raw' ? 'Raw sources are immutable: read only; never edit, move, or rename them.' : layer === 'wiki' ? 'The LLM maintains linked compiled knowledge with source links and clear fact/opinion/hypothesis/inference labels.' : 'Outputs cite their Wiki basis and remain local working artifacts.'; return `# ${layer}/ CLAUDE.md — Personal LLM Wiki layer contract\n\n${mutability}\n\n## Selected areas\n\n${entries.map(entry => `- \`${entry.id}/\`: ${entry.purpose}`).join('\n')}\n\nDo not ingest CLAUDE.md or .gitkeep as source content.\n` }
-function memberClaude(plan) { return `# Personal LLM Wiki operating contract\n\nRead PROFILE.md, CONTEXT.md, WIKI_SCHEMA.md, then this file before operating this member Wiki. This is a cross-agent contract: its familiar CLAUDE.md filename is intentional and applies to Codex and other agents.\n\n- raw/ is immutable source of truth; read raw/CLAUDE.md before ingest.\n- Ingest compiles one source into linked wiki pages, updates wiki/index.md, and appends wiki/log.md.\n- Query reads wiki/index.md first and writes a durable result only with approval.\n- Lint identifies contradictions, staleness, orphaned pages, missing links, and knowledge gaps.\n- wiki/ is the persistent compiled knowledge layer; read wiki/CLAUDE.md before edits. output/ is local result work; read output/CLAUDE.md before creating outputs.\n- Label facts, personal opinions, hypotheses, and AI inferences. Keep raw → wiki → output links and source references.\n- Never create harnesses/, *.SKILL.md, WIKI_INDEX.md, or ACTIVITY_LOG.md in this personal Wiki.\n\nCurrent selected areas: raw(${plan.raw.map(x => x.id).join(', ')}), wiki(${plan.wiki.map(x => x.id).join(', ')}), output(${plan.output.map(x => x.id).join(', ')}).\n` }
-function renderedFiles(memberId, plan, contextOriginal) {
+function renderedFiles(memberId, plan, rootClaude, compatibilityBootstrap = false) {
   const base = `members/${memberId}`; const files = {}
-  files[`${base}/CLAUDE.md`] = memberClaude(plan)
+  files[`${base}/CLAUDE.md`] = compatibilityBootstrap ? bootstrapClaude(rootClaude, plan) : claudeWithRules(rootClaude, plan)
   files[`${base}/WIKI_SCHEMA.md`] = `# Personal LLM Wiki Schema\n\nMachine-readable companion to CLAUDE.md; avoid duplicating operating prose.\n\n## Exact tree\n\n${['raw', 'wiki', 'output'].map(layer => `- \`${layer}/\`: ${plan[layer].map(item => `\`${item.id}/\` (${item.label})`).join(', ')}`).join('\n')}\n\n## Information flow\n\n${plan.raw.map((source, index) => { const wikiId = source.links?.[0] || plan.wiki[index % plan.wiki.length].id; const wikiEntry = plan.wiki.find(item => item.id === wikiId) || plan.wiki[0]; const outputId = wikiEntry.links?.[0] || plan.output[index % plan.output.length].id; return `- \`raw/${source.id}/\` → \`wiki/${wikiId}/\` → \`output/${outputId}/\`; evidence: ${source.evidence.join(', ')}.` }).join('\n')}\n`
-  if (contextOriginal.includes(managedStart)) files[`${base}/CONTEXT.md`] = removeLegacyRules(contextOriginal)
   for (const layer of ['raw', 'wiki', 'output']) { files[`${base}/${layer}/CLAUDE.md`] = folderClaude(layer, plan[layer]); for (const entry of plan[layer]) files[`${base}/${layer}/${entry.id}/.gitkeep`] = '' }
   files[`${base}/wiki/index.md`] = `# Wiki index\n\nThis compiled Wiki starts without ingested sources.\n\n## Knowledge areas\n\n${plan.wiki.map(item => `- [${item.label}](./${item.id}/) — ${item.purpose}`).join('\n')}\n\n## Initial tracking\n\n${plan.wiki.map(item => `- ${item.label}: planned from ${item.evidence.join(', ')}; no source ingested yet.`).join('\n')}\n`
   files[`${base}/wiki/log.md`] = `# Wiki log\n\n## [initialization] init | personalized LLM Wiki\n\n- Created evidence-backed raw → wiki → output structure.\n- No source has been ingested.\n- Future ingest/query/lint events append here.\n`
   return files
 }
-async function migration(repoRoot, memberId, candidateFiles = []) {
+async function migration(repoRoot, memberId, candidateFiles = [], { rootClaude = null, legacyContext = null, compatibilityBootstrap = false } = {}) {
   const { target } = await safeExistingMember(repoRoot, memberId); const entries = await (await import('node:fs/promises')).readdir(target)
-  const structural = entries.filter(name => !['PROFILE.md', 'CONTEXT.md'].includes(name)); const context = await readFile(join(target, 'CONTEXT.md'), 'utf8'); const hasLegacyMarker = context.includes(managedStart) || context.includes(managedEnd)
-  if (hasLegacyMarker) removeLegacyRules(context)
-  if (!structural.length && !hasLegacyMarker) return { required: false, actions: [] }
+  const structural = entries.filter(name => !['PROFILE.md', 'CONTEXT.md', 'CLAUDE.md'].includes(name)); const hasManagedRules = Boolean(rootClaude && (rootClaude.includes(managedStart) || rootClaude.includes(managedEnd)))
+  if (hasManagedRules) removeLegacyRules(rootClaude)
   const actions = new Map()
   const legacyUnmanaged = new Set(['WIKI_INDEX.md', 'ACTIVITY_LOG.md', 'harnesses'])
   for (const name of structural) { const item = join(target, name); const stat = await lstat(item); actions.set(name, { action: 'keep', path: name, ...(legacyUnmanaged.has(name) ? { classification: 'legacy-unmanaged' } : {}), ...(stat.isFile() ? { originalHash: contentDigest(await readFile(item)) } : {}) }) }
-  const replaceable = new Set([`members/${memberId}/CONTEXT.md`, `members/${memberId}/CLAUDE.md`, `members/${memberId}/WIKI_SCHEMA.md`, `members/${memberId}/wiki/index.md`, `members/${memberId}/raw/CLAUDE.md`, `members/${memberId}/wiki/CLAUDE.md`, `members/${memberId}/output/CLAUDE.md`])
+  if (compatibilityBootstrap) actions.set('CONTEXT.md', { action: 'keep', path: 'CONTEXT.md', classification: 'legacy-context-bootstrap', originalHash: contentDigest(legacyContext) })
+  const replaceable = new Set([`members/${memberId}/CLAUDE.md`, `members/${memberId}/WIKI_SCHEMA.md`, `members/${memberId}/wiki/index.md`, `members/${memberId}/raw/CLAUDE.md`, `members/${memberId}/wiki/CLAUDE.md`, `members/${memberId}/output/CLAUDE.md`])
   for (const file of candidateFiles) {
     const relativePath = file.path.replace(`members/${memberId}/`, ''); const destination = join(target, relativePath)
     if (await exists(destination)) {
@@ -151,23 +144,27 @@ async function migration(repoRoot, memberId, candidateFiles = []) {
       else actions.set(relativePath, { action: 'keep', path: relativePath, ...(stat.isFile() ? { originalHash: contentDigest(await readFile(destination)) } : {}) })
     } else actions.set(relativePath, { action: 'add', path: relativePath })
   }
-  return { required: true, actions: [...actions.values()].sort((a, b) => a.path.localeCompare(b.path)) }
+  return { required: compatibilityBootstrap || structural.length > 0 || hasManagedRules, kind: compatibilityBootstrap ? 'legacy-context-bootstrap' : hasManagedRules ? 'managed-rules-update' : structural.length ? 'existing-structure' : 'fresh-rules-append', actions: [...actions.values()].sort((a, b) => a.path.localeCompare(b.path)) }
 }
 export async function startPersonalWikiInit(input = {}, options = {}) {
-  const memberId = safeMemberId(input.memberId); const { profile, context, principles, profileDigest, contextDigest } = await readInputs(options.repoRoot, memberId); const proposed = await proposedPlan(profile, context, principles, { ...options, providerApproved: input.providerApproved === true })
-  if (!proposed.plan) { const state = { version: 1, phase: 'clarification', memberId, profile, context, profileDigest, contextDigest, providerApproved: input.providerApproved === true, clarificationCount: 0 }; return { state, events: [event('session.started', { command: 'personal-wiki-init', memberId }), event('provider.consent', { enabled: input.providerApproved === true }), event('clarification.required', { question: proposed.clarification, count: 1, maximum: 1 }), event('session.completed', { phase: 'insufficient-context' })], result: { status: 'insufficient-context', mode: proposed.mode, providerStatus: proposed.providerStatus } }
+  const memberId = safeMemberId(input.memberId); const inputs = await readInputs(options.repoRoot, memberId)
+  if (inputs.inputMissing) return { state: { version: 1, phase: 'insufficient-context', memberId, profileDigest: inputs.profileDigest }, events: [event('session.started', { command: 'personal-wiki-init', memberId }), event('clarification.required', { question: 'canonical CLAUDE.md 또는 legacy CONTEXT.md가 필요합니다.', count: 0, maximum: 0 }), event('session.completed', { phase: 'insufficient-context' })], result: { status: 'insufficient-context', mode: 'offline-conservative', providerStatus: 'not-consented' } }
+  const { profile, primary, primaryKind, compatibilityBootstrap, principles, profileDigest, primaryDigest, legacyContextDigest } = inputs; const proposed = await proposedPlan(profile, primary, primaryKind === 'CLAUDE' ? 'CLAUDE' : 'CONTEXT', principles, { ...options, providerApproved: input.providerApproved === true })
+  if (!proposed.plan) { const state = { version: 1, phase: 'clarification', memberId, profile, rootClaude: primary, primaryKind, compatibilityBootstrap, profileDigest, primaryDigest, legacyContextDigest, providerApproved: input.providerApproved === true, clarificationCount: 0 }; return { state, events: [event('session.started', { command: 'personal-wiki-init', memberId }), event('provider.consent', { enabled: input.providerApproved === true }), event('clarification.required', { question: proposed.clarification, count: 1, maximum: 1 }), event('session.completed', { phase: 'insufficient-context' })], result: { status: 'insufficient-context', mode: proposed.mode, providerStatus: proposed.providerStatus } }
   }
-  const candidate = renderedFiles(memberId, proposed.plan, context); const existing = await migration(options.repoRoot, memberId, Object.entries(candidate).map(([path, content]) => ({ path, content }))); const state = { version: 1, phase: 'preview', memberId, context, profileDigest, contextDigest, plan: proposed.plan, mode: proposed.mode, providerStatus: proposed.providerStatus, migration: existing }; const preview = previewPersonalWikiInit(state)
+  const candidate = renderedFiles(memberId, proposed.plan, primary, compatibilityBootstrap); const existing = await migration(options.repoRoot, memberId, Object.entries(candidate).map(([path, content]) => ({ path, content })), { rootClaude: compatibilityBootstrap ? null : primary, legacyContext: compatibilityBootstrap ? primary : null, compatibilityBootstrap }); const state = { version: 1, phase: 'preview', memberId, rootClaude: primary, primaryKind, compatibilityBootstrap, profileDigest, primaryDigest, legacyContextDigest, plan: proposed.plan, mode: proposed.mode, providerStatus: proposed.providerStatus, migration: existing }; const preview = previewPersonalWikiInit(state)
   return { state, events: [event('session.started', { command: 'personal-wiki-init', memberId }), event('provider.consent', { enabled: input.providerApproved === true }), event('map.proposed', { map: mapSummary(proposed.plan), mode: proposed.mode }), ...(existing.required ? [event('migration.required', { actions: existing.actions })] : []), event('files.planned', { files: preview.files.map(file => file.path), digest: preview.digest }), event('approval.required', { digest: preview.digest, reason: existing.required ? '기존 구조가 있어 migration 승인도 필요합니다.' : '미리보기와 digest를 확인한 뒤 명시적으로 승인해야 저장할 수 있습니다.' })], result: { preview, migration: existing, mode: proposed.mode, providerStatus: proposed.providerStatus } }
 }
 function mapSummary(plan) { return Object.fromEntries(['raw', 'wiki', 'output'].map(layer => [layer, plan[layer].map(item => ({ id: item.id, label: item.label, purpose: item.purpose, evidence: item.evidence, examples: item.examples, links: item.links || [], flow: layer === 'raw' ? 'immutable source' : layer === 'wiki' ? 'compiled knowledge' : 'evidence-grounded result' }))])) }
-export function previewPersonalWikiInit(state) { if (!state || state.version !== 1 || state.phase !== 'preview') fail('초기화 preview 세션이 필요합니다.', 'invalid-session'); const files = renderedFiles(state.memberId, state.plan, state.context); const keep = new Set((state.migration?.actions || []).filter(item => item.action === 'keep').map(item => `members/${state.memberId}/${item.path}`)); for (const path of keep) delete files[path]; return { kind: 'personal-wiki-init', mode: state.mode, migration: state.migration, profileDigest: state.profileDigest, contextDigest: state.contextDigest, plan: state.plan, files: Object.entries(files).map(([path, content]) => ({ path, content })), digest: digest({ files, mode: state.mode, migration: state.migration, profileDigest: state.profileDigest, contextDigest: state.contextDigest }) } }
+export function previewPersonalWikiInit(state) { if (!state || state.version !== 1 || state.phase !== 'preview') fail('초기화 preview 세션이 필요합니다.', 'invalid-session'); const files = renderedFiles(state.memberId, state.plan, state.rootClaude, state.compatibilityBootstrap); const keep = new Set((state.migration?.actions || []).filter(item => item.action === 'keep').map(item => `members/${state.memberId}/${item.path}`)); for (const path of keep) delete files[path]; return { kind: 'personal-wiki-init', mode: state.mode, migration: state.migration, profileDigest: state.profileDigest, primaryDigest: state.primaryDigest, primaryKind: state.primaryKind, legacyContextDigest: state.legacyContextDigest, plan: state.plan, files: Object.entries(files).map(([path, content]) => ({ path, content })), digest: digest({ files, mode: state.mode, migration: state.migration, profileDigest: state.profileDigest, primaryDigest: state.primaryDigest, primaryKind: state.primaryKind, legacyContextDigest: state.legacyContextDigest }) } }
 async function atomicSave(preview, repoRoot) {
   const memberId = preview.files[0]?.path.match(/^members\/([^/]+)\//)?.[1]; const { root, target } = await safeExistingMember(repoRoot, memberId); const stage = resolve(root, `.personal-wiki-init-${randomUUID()}`); const created = []; const createdDirs = []; const replaced = []; const backupFiles = []
   const actions = new Map((preview.migration?.actions || []).map(action => [action.path, action])); const backupRoot = join(target, '.wiki-migration-backup', preview.digest)
   const ensureTargetDirectory = async path => { const missing = []; let current = path; while (current !== target && !(await exists(current))) { missing.push(current); current = dirname(current) }; if (current !== target && current !== dirname(target)) { const stat = await lstat(current); if (stat.isSymbolicLink() || !stat.isDirectory()) fail('안전하지 않은 대상 디렉터리입니다.', 'unsafe-path') }; for (const directory of missing.reverse()) { await mkdir(directory); createdDirs.push(directory) } }
   try {
-    if (contentDigest(await readFile(join(target, 'PROFILE.md'), 'utf8')) !== preview.profileDigest || contentDigest(await readFile(join(target, 'CONTEXT.md'), 'utf8')) !== preview.contextDigest) fail('PROFILE.md 또는 CONTEXT.md가 preview 뒤 변경되었습니다.', 'preview-mismatch')
+    if (contentDigest(await readFile(join(target, 'PROFILE.md'), 'utf8')) !== preview.profileDigest) fail('PROFILE.md가 preview 뒤 변경되었습니다.', 'preview-mismatch')
+    if (preview.primaryKind === 'CLAUDE' && (!(await exists(join(target, 'CLAUDE.md'))) || contentDigest(await readFile(join(target, 'CLAUDE.md'), 'utf8')) !== preview.primaryDigest)) fail('CLAUDE.md가 preview 뒤 변경되었습니다.', 'preview-mismatch')
+    if (preview.primaryKind === 'CONTEXT-compatibility' && (!(await exists(join(target, 'CONTEXT.md'))) || contentDigest(await readFile(join(target, 'CONTEXT.md'), 'utf8')) !== preview.primaryDigest)) fail('legacy CONTEXT.md가 preview 뒤 변경되었습니다.', 'preview-mismatch')
     for (const file of preview.files) {
       const relativePath = file.path.replace(`members/${memberId}/`, ''); const destination = resolve(root, file.path); const action = actions.get(relativePath) || { action: 'add' }
       if (!destination.startsWith(`${target}${sep}`)) fail('허용되지 않은 저장 경로입니다.', 'unsafe-path')
@@ -198,9 +195,9 @@ export async function advancePersonalWikiInit(state, input = {}, options = {}) {
   if (!state || state.version !== 1) fail('초기화 세션을 먼저 시작해 주세요.', 'invalid-session')
   if (state.phase === 'clarification') {
     if (input.action !== 'clarification' || state.clarificationCount >= 1 || !clean(input.answer, 400)) fail('한 번의 범위 있는 clarification 답변이 필요합니다.', 'insufficient-context')
-    const combined = `${state.context}\n## Wiki initialization clarification\n- ${clean(input.answer, 400)}`; const proposed = offlinePlan(state.profile, combined)
+    const combined = `${state.rootClaude}\n## Wiki initialization clarification\n- ${clean(input.answer, 400)}`; const proposed = offlinePlan(state.profile, combined, state.primaryKind === 'CLAUDE' ? 'CLAUDE' : 'CONTEXT')
     if (!proposed.plan) return { state: { ...state, clarificationCount: 1 }, events: [event('clarification.insufficient')], result: { status: 'insufficient-context' } }
-    const candidate = renderedFiles(state.memberId, proposed.plan, state.context); const existing = await migration(options.repoRoot, state.memberId, Object.entries(candidate).map(([path, content]) => ({ path, content }))); const next = { version: 1, phase: 'preview', memberId: state.memberId, context: state.context, profileDigest: state.profileDigest, contextDigest: state.contextDigest, plan: proposed.plan, mode: 'offline-conservative', providerStatus: 'not-consented', migration: existing }; const preview = previewPersonalWikiInit(next)
+    const candidate = renderedFiles(state.memberId, proposed.plan, state.rootClaude, state.compatibilityBootstrap); const existing = await migration(options.repoRoot, state.memberId, Object.entries(candidate).map(([path, content]) => ({ path, content })), { rootClaude: state.compatibilityBootstrap ? null : state.rootClaude, legacyContext: state.compatibilityBootstrap ? state.rootClaude : null, compatibilityBootstrap: state.compatibilityBootstrap }); const next = { version: 1, phase: 'preview', memberId: state.memberId, rootClaude: state.rootClaude, primaryKind: state.primaryKind, compatibilityBootstrap: state.compatibilityBootstrap, profileDigest: state.profileDigest, primaryDigest: state.primaryDigest, legacyContextDigest: state.legacyContextDigest, plan: proposed.plan, mode: 'offline-conservative', providerStatus: 'not-consented', migration: existing }; const preview = previewPersonalWikiInit(next)
     return { state: next, events: [event('map.proposed', { map: mapSummary(next.plan), mode: next.mode }), event('files.planned', { files: preview.files.map(file => file.path), digest: preview.digest }), event('approval.required', { digest: preview.digest })], result: { preview, migration: existing } }
   }
   if (state.phase !== 'preview') fail('이미 완료된 세션입니다.', 'session-complete')

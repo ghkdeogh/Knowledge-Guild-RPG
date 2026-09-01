@@ -13,7 +13,7 @@
 
 1. `WIKI_RULES.md`를 읽습니다.
 2. 현재 사용자의 `member-id`를 확인합니다.
-3. `members/{member-id}/CONTEXT.md`, `WIKI_SCHEMA.md`, root `CLAUDE.md`, `wiki/CLAUDE.md`, `wiki/index.md`를 읽습니다. raw 또는 output을 다룰 때는 해당 layer의 `CLAUDE.md`도 읽습니다.
+3. `members/{member-id}/PROFILE.md`, root `CLAUDE.md`, `WIKI_SCHEMA.md`, `wiki/CLAUDE.md`, `wiki/index.md`를 읽습니다. `CONTEXT.md`는 legacy compatibility projection일 때만 읽고 root CLAUDE와 자동 병합하지 않습니다. raw 또는 output을 다룰 때는 해당 layer의 `CLAUDE.md`도 읽습니다.
 4. `WIKI_SCHEMA.md`가 없으면 인제스트를 계속하기 전에 `prompts/wiki-init.md`로 개인 구조를 완성하도록 안내합니다.
 5. `members/{member-id}/raw/`에서 새로 추가된 파일을 찾습니다.
 

@@ -83,11 +83,11 @@ node scripts/release-quickstart.mjs --target <new-absolute-directory-outside-thi
 
 ### 개인 프로필 온보딩
 
-개인 작업 맥락부터 정리하려면 “온보딩 시작해줘”라고 요청하거나 `profile-onboarding-cli.mjs`를 사용합니다. 스트리밍 JSONL은 이름을 먼저 묻고, 공개 범위를 명시 확인한 뒤 `나는 누구인가 → 기록하려는 이유 → 원하는 결과물`의 세 질문만 한 번에 하나씩 진행합니다. 한국어 이름처럼 바로 쓸 수 없는 이름 뒤에는 저장용 `member-id`를 별도로 확인합니다. 각 답변 뒤 구조화 요약과 다음 질문을 출력하며, 마지막에는 `PROFILE.md`와 provider-neutral `CONTEXT.md`의 preview/digest를 냅니다. 같은 실행 세션에서 출력된 digest로 `approve`와 별도 `save`를 모두 보내야 선택한 `members/<member-id>/`에 저장됩니다. 저장 완료 이벤트의 `personal-wiki-init.next-step`이 다음 기본 경로입니다.
+개인 작업 맥락부터 정리하려면 “온보딩 시작해줘”라고 요청하거나 `profile-onboarding-cli.mjs`를 사용합니다. 스트리밍 JSONL은 이름을 먼저 묻고, 공개 범위를 명시 확인한 뒤 `나는 누구인가 → 기록하려는 이유 → 원하는 결과물`의 세 질문만 한 번에 하나씩 진행합니다. 한국어 이름처럼 바로 쓸 수 없는 이름 뒤에는 저장용 `member-id`를 별도로 확인합니다. 각 답변 뒤 구조화 요약과 다음 질문을 출력하며, 마지막에는 `PROFILE.md`와 canonical personal `CLAUDE.md`의 preview/digest를 냅니다. 같은 실행 세션에서 출력된 digest로 `approve`와 별도 `save`를 모두 보내야 선택한 `members/<member-id>/`에 저장됩니다. 저장 완료 이벤트의 `personal-wiki-init.next-step`이 다음 기본 경로입니다.
 
 ### 개인화 LLM Wiki 초기화
 
-“위키 초기화해줘”라고 요청하거나 아래 스트리밍 JSONL 명령을 사용하세요. 이 초기화기는 선택한 `members/<member-id>/PROFILE.md`, `CONTEXT.md`, 그리고 `prompts/llm-wiki.md`의 원칙만 바탕으로, 근거가 있는 `raw → wiki → output` 구조를 제안합니다. PROFILE.md와 CONTEXT.md는 fresh init에서 byte-identical로 보존합니다. member와 각 계층의 `CLAUDE.md`는 Codex를 포함한 모든 agent가 읽는 cross-agent 운영 계약입니다. `raw/`와 `output/` 및 그 안의 `CLAUDE.md`는 로컬 전용이고, `wiki/CLAUDE.md`도 공개 지식이 아닌 운영 설정이며 snapshot 대상이 아닙니다.
+“위키 초기화해줘”라고 요청하거나 아래 스트리밍 JSONL 명령을 사용하세요. 이 초기화기는 선택한 `members/<member-id>/PROFILE.md`, existing root `CLAUDE.md`, 그리고 `prompts/llm-wiki.md`의 원칙만 바탕으로, 근거가 있는 `raw → wiki → output` 구조를 제안합니다. root CLAUDE는 canonical every-run personal context이며 초기화기는 기존 byte를 보존하고 관리되는 Wiki operations block만 append/replace합니다. `CONTEXT.md`는 legacy compatibility projection일 뿐 둘을 자동 병합하지 않습니다. member와 각 계층의 `CLAUDE.md`는 Codex를 포함한 모든 agent가 읽는 cross-agent 운영 계약입니다. `raw/`와 `output/` 및 그 안의 `CLAUDE.md`는 로컬 전용이고, `wiki/CLAUDE.md`도 공개 지식이 아닌 운영 설정이며 snapshot 대상이 아닙니다.
 
 ```powershell
 @'
@@ -95,7 +95,7 @@ node scripts/release-quickstart.mjs --target <new-absolute-directory-outside-thi
 '@ | node scripts/personal-wiki-init-cli.mjs
 ```
 
-preview 후 같은 세션에서 `{"action":"approve","expectedDigest":"<digest>"}`와 별도 `save`를 보냅니다. PROFILE/CONTEXT를 OpenAI Responses 제공자에 보낼 수 있는 경우에만 시작 요청에 `"providerApproved":true`를 넣으세요. 기존 scaffold나 개인 구조가 있으면 keep/add/replace migration diff를 먼저 보여 줍니다. `migrationApproved:true`로 승인하면 preview에 선언된 `CLAUDE.md`·`WIKI_SCHEMA.md`·`wiki/index.md`만 recoverable backup과 함께 교체합니다. 이전 CONTEXT-managed 구현의 명시적 marker 블록은 이 승인 migration에서만 제거하며, marker 밖의 byte는 보존합니다. fresh init은 `CONTEXT.md`를 전혀 변경하지 않습니다. `WIKI_INDEX.md`, `ACTIVITY_LOG.md`, harness, raw/wiki/output 사용자 내용은 legacy/unmanaged로 남기며 삭제·이동하지 않습니다. 기존 `wiki-architect`의 personal `preview/save`는 더 이상 사용할 수 없으며 프로필 뒤 기본 초기화 경로는 personal initializer입니다.
+preview 후 같은 세션에서 `{"action":"approve","expectedDigest":"<digest>"}`와 별도 `save`를 보냅니다. PROFILE/root CLAUDE를 OpenAI Responses 제공자에 보낼 수 있는 경우에만 시작 요청에 `"providerApproved":true`를 넣으세요. 기존 scaffold나 root CLAUDE의 managed operations block이 있으면 keep/add/replace migration diff를 먼저 보여 줍니다. `migrationApproved:true`로 승인하면 preview에 선언된 root/scoped `CLAUDE.md`·`WIKI_SCHEMA.md`·`wiki/index.md`만 recoverable backup과 함께 교체합니다. PROFILE+CONTEXT/no-CLAUDE legacy member는 compatibility bootstrap으로 root CLAUDE를 add하고 CONTEXT를 그대로 보존합니다. `WIKI_INDEX.md`, `ACTIVITY_LOG.md`, harness, raw/wiki/output 사용자 내용은 legacy/unmanaged로 남기며 삭제·이동하지 않습니다. 기존 `wiki-architect`의 personal `preview/save`는 더 이상 사용할 수 없으며 프로필 뒤 기본 초기화 경로는 personal initializer입니다.
 
 ## CLI 사용법
 
@@ -170,8 +170,8 @@ printf '%s\n' '{}' | node scripts/wiki-architect-cli.mjs --command status
 
 ```text
 members/<member-id>/       # profile-first personalized initializer가 만드는 personal Wiki
-  PROFILE.md · CONTEXT.md  # profile context; unchanged by fresh Wiki init
-  CLAUDE.md                # cross-agent operational contract
+  PROFILE.md               # detailed profile
+  CLAUDE.md                # canonical personal context + managed Wiki operations
   WIKI_SCHEMA.md           # 실제 개인화 raw → wiki → output 구조와 mapping
   raw/CLAUDE.md            # immutable source 계층의 local contract
   wiki/CLAUDE.md · index.md · log.md

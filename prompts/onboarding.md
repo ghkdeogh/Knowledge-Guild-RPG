@@ -16,7 +16,7 @@
 
 이름을 확인한 뒤 인터뷰를 시작하기 전에 다음 공개 범위를 설명하고 확인받으세요.
 
-> `PROFILE.md`와 `CONTEXT.md`는 Git에 커밋되면 저장소 접근자가 읽을 수 있습니다. 공유해도 되는 내용만 답변하고, 비공개로 남길 내용은 말해 주세요. 비공개 정보는 Git에서 제외되는 `PROFILE.private.md` 또는 `CONTEXT.private.md`에만 둘 수 있습니다.
+> `PROFILE.md`와 member root `CLAUDE.md`는 Git에 커밋되면 저장소 접근자가 읽을 수 있습니다. 공유해도 되는 내용만 답변하고, 비공개로 남길 내용은 말해 주세요. 비공개 정보는 Git에서 제외되는 `PROFILE.private.md` 또는 `CONTEXT.private.md`에만 둘 수 있습니다.
 
 사용자가 비공개 표시를 한 답변은 공유 파일에 원문, 요약, 추론 형태로도 포함하지 마세요. 기본 CLI 흐름에서는 비공개 내용을 입력하지 않도록 안내하며, 공개 범위를 명시적으로 확인하기 전에는 인터뷰 질문을 시작하지 않습니다. 외부 AI 제공자 사용은 기본값이 아니며, 답변과 승인된 seed 원문 전송 범위를 설명한 뒤 별도의 `providerApproved: true` 동의가 있을 때만 사용하세요.
 
@@ -55,7 +55,7 @@
 
 ## 4. 인터뷰 완료
 
-모든 질문이 끝나면 **나의 맥락 요약**과 `PROFILE.md`, `CONTEXT.md` 미리보기를 만드세요. 보여 준 파일 경로와 digest를 사용자가 명시적으로 승인하기 전에는 파일을 만들지 마세요. 저장할 때도 기존 파일을 덮어쓰지 말고 collision으로 실패하세요. 기본 온보딩은 `projects/`에 어떤 파일도 만들거나 수정하지 않습니다.
+모든 질문이 끝나면 **나의 맥락 요약**과 `PROFILE.md`, root `CLAUDE.md` 미리보기를 만드세요. 보여 준 파일 경로와 digest를 사용자가 명시적으로 승인하기 전에는 파일을 만들지 마세요. 저장할 때도 기존 파일을 덮어쓰지 말고 collision으로 실패하세요. 기본 온보딩은 `projects/`에 어떤 파일도 만들거나 수정하지 않습니다.
 
 ### `PROFILE.md`
 
@@ -77,9 +77,9 @@
 
 ---
 
-### `CONTEXT.md`
+### member root `CLAUDE.md`
 
-`PROFILE.md`를 기반으로 AI가 앞으로 이 사용자와 작업할 때 빠르게 참고할 수 있는 핵심 컨텍스트를 작성하세요.
+`PROFILE.md`를 기반으로 AI가 앞으로 이 사용자와 작업할 때 매번 참고할 canonical personal context를 작성하세요.
 
 다음 구조로 작성하세요.
 
@@ -101,7 +101,7 @@ AI가 어떤 방식으로 조사, 분석, 아이디어 발전, 검증을 도와�
 
 사용자 승인 전에는 저장하지 않으며, 현재 member scope 밖과 `projects/`를 기본 온보딩에서 읽거나 쓰지 않습니다.
 
-`CONTEXT.md`는 AI가 자주 읽는 문서이므로 `PROFILE.md`보다 짧고 핵심적으로 작성하세요. provider-neutral canonical 파일로 쓰며, repo-level `AGENTS.md`를 대체하거나 덮어쓰지 않습니다. 별도 `CLAUDE.md`는 기본 생성하지 않습니다. 필요해도 member scope의 파생 projection이어야 하며, 별도 승인과 테스트가 필요합니다.
+root `CLAUDE.md`는 AI가 자주 읽는 문서이므로 `PROFILE.md`보다 짧고 핵심적으로 작성하세요. provider-neutral cross-agent canonical 파일로 쓰며, repo-level `AGENTS.md`를 대체하거나 덮어쓰지 않습니다. 개인 Wiki 초기화기는 이 파일의 기존 byte를 보존하고 marker로 구분한 Wiki 운영 규칙만 추가합니다. 새 온보딩은 `CONTEXT.md`를 만들지 않습니다; 기존 `CONTEXT.md`는 compatibility projection일 뿐 root CLAUDE와 병합하지 않습니다.
 
 정보가 없는 항목은 억지로 채우지 마세요.
 
@@ -116,7 +116,7 @@ AI가 어떤 방식으로 조사, 분석, 아이디어 발전, 검증을 도와�
 * 사용자가 말하지 않은 내용을 추측해서 추가하지 마세요.
 * 서로 다른 의견이 존재하는 것은 정상입니다.
 * `PROFILE.md`는 상세한 인터뷰 기록으로 작성하세요.
-* `CONTEXT.md`는 AI가 반복적으로 참고할 핵심 정보만 압축해서 작성하세요.
+* root `CLAUDE.md`는 AI가 반복적으로 참고할 핵심 정보만 압축해서 작성하세요.
 
 인터뷰 완료 후 미리보기의 두 파일 경로와 digest를 사용자에게 알려주세요. 공유 파일에 포함한 범위를 보여 주고 명시 승인 뒤에만 저장하세요.
 
