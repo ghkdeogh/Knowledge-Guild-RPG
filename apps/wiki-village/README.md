@@ -24,6 +24,8 @@ For profile-first onboarding, say **“온보딩 시작해줘”** or use the st
 
 Continue the same session with the three `{"action":"answer","answer":"..."}` topic replies. The third reply emits `approval.required` with `<digest>`; then send `{"action":"approve","expectedDigest":"<digest>"}` and `{"action":"save","expectedDigest":"<digest>"}`. A fresh process starts a fresh session, so do not use a one-shot pipe for the approval step. The credential-free `local-draft` interpreter is the default; when a configured external AI provider may receive interview answers and approved seed content, include `"providerApproved":true` only in the privacy confirmation after reviewing that transfer.
 
+After the profile is saved, use the emitted `personal-wiki-init.next-step` command (or say “위키 초기화해줘”). `personal-wiki-init-cli.mjs` is a separate streaming JSONL flow that reads only that selected member's `PROFILE.md` and `CONTEXT.md`, proposes evidence-backed `raw/`, `wiki/`, and lowercase `output/` subfolders, then requires preview/digest approval before atomically appending its managed rules block and creating `WIKI_SCHEMA.md`, folder `CONTEXT.md` files, `wiki/index.md`, and `wiki/log.md`. It never makes `WIKI_INDEX.md`, `ACTIVITY_LOG.md`, or `harnesses/*.SKILL.md`. Use `providerApproved: true` only when the profile/context may be sent to the configured Responses provider; otherwise it stays conservative and offline. Existing structures produce a migration preview only—nothing is deleted or moved automatically.
+
 ## Village states
 
 - `FLOW_UNINITIALIZED`: no public Wiki record; one CLI `analyze` command, no hall, characters, or example data.

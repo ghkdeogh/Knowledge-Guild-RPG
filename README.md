@@ -83,7 +83,19 @@ node scripts/release-quickstart.mjs --target <new-absolute-directory-outside-thi
 
 ### 개인 프로필 온보딩
 
-개인 작업 맥락부터 정리하려면 “온보딩 시작해줘”라고 요청하거나 `profile-onboarding-cli.mjs`를 사용합니다. 스트리밍 JSONL은 이름을 먼저 묻고, 공개 범위를 명시 확인한 뒤 `나는 누구인가 → 기록하려는 이유 → 원하는 결과물`의 세 질문만 한 번에 하나씩 진행합니다. 한국어 이름처럼 바로 쓸 수 없는 이름 뒤에는 저장용 `member-id`를 별도로 확인합니다. 각 답변 뒤 구조화 요약과 다음 질문을 출력하며, 마지막에는 `PROFILE.md`와 provider-neutral `CONTEXT.md`의 preview/digest를 냅니다. 같은 실행 세션에서 출력된 digest로 `approve`와 별도 `save`를 모두 보내야 선택한 `members/<member-id>/`에 저장됩니다. 기본 흐름은 `projects/`를 만들거나 바꾸지 않으며 `CLAUDE.md`도 생성하지 않습니다.
+개인 작업 맥락부터 정리하려면 “온보딩 시작해줘”라고 요청하거나 `profile-onboarding-cli.mjs`를 사용합니다. 스트리밍 JSONL은 이름을 먼저 묻고, 공개 범위를 명시 확인한 뒤 `나는 누구인가 → 기록하려는 이유 → 원하는 결과물`의 세 질문만 한 번에 하나씩 진행합니다. 한국어 이름처럼 바로 쓸 수 없는 이름 뒤에는 저장용 `member-id`를 별도로 확인합니다. 각 답변 뒤 구조화 요약과 다음 질문을 출력하며, 마지막에는 `PROFILE.md`와 provider-neutral `CONTEXT.md`의 preview/digest를 냅니다. 같은 실행 세션에서 출력된 digest로 `approve`와 별도 `save`를 모두 보내야 선택한 `members/<member-id>/`에 저장됩니다. 저장 완료 이벤트의 `personal-wiki-init.next-step`이 다음 기본 경로입니다.
+
+### 개인화 LLM Wiki 초기화
+
+“위키 초기화해줘”라고 요청하거나 아래 스트리밍 JSONL 명령을 사용하세요. 이 초기화기는 선택한 `members/<member-id>/PROFILE.md`, `CONTEXT.md`, 그리고 `prompts/llm-wiki.md`의 원칙만 바탕으로, 근거가 있는 `raw → wiki → output` 구조를 제안합니다. `raw/`와 `output/`은 로컬 전용이고 `wiki/`의 공개 페이지들만 snapshot 대상입니다. 미리보기와 digest 승인 전에는 파일을 쓰지 않으며, 근거가 부족하면 한 번만 보충 질문을 하거나 중단합니다.
+
+```powershell
+@'
+{"action":"start","memberId":"<member-id>"}
+'@ | node scripts/personal-wiki-init-cli.mjs
+```
+
+preview 후 같은 세션에서 `{"action":"approve","expectedDigest":"<digest>"}`와 별도 `save`를 보냅니다. PROFILE/CONTEXT를 OpenAI Responses 제공자에 보낼 수 있는 경우에만 시작 요청에 `"providerApproved":true`를 넣으세요. 기존 scaffold나 개인 구조가 있으면 삭제·이동하지 않고 keep/add/replace/remove migration diff만 보여 주며 자동 저장하지 않습니다. 기존 `wiki-architect`의 personal `preview/save`는 첫 공개 기록을 위한 legacy/advanced 경로이며, 프로필 뒤 기본 초기화 경로가 아닙니다.
 
 ## CLI 사용법
 
@@ -157,12 +169,12 @@ printf '%s\n' '{}' | node scripts/wiki-architect-cli.mjs --command status
 모든 프로젝트에 똑같은 지식 분류를 강요하지 않습니다. 공통 골격만 안전하게 유지하고, blueprint가 목적에 맞는 page type과 routing을 정합니다.
 
 ```text
-members/<member-id>/       # 기본 preview/save가 만드는 personal-only scaffold
-  CONTEXT.md               # 로컬 최소 identity/context; public snapshot·evidence·citation 대상 아님
-  WIKI_SCHEMA.md           # 로컬 schema 설정; public snapshot·evidence·citation 대상 아님
-  WIKI_INDEX.md · ACTIVITY_LOG.md
-  wiki/                    # 공개 개인 Wiki 계층과 첫 public index
-  harnesses/               # 선택된 ingest/query/lint/reflect SKILL.md scaffold
+members/<member-id>/       # profile-first personalized initializer가 만드는 personal Wiki
+  PROFILE.md · CONTEXT.md  # CONTEXT에는 관리되는 Wiki 운영 규칙 블록만 append
+  WIKI_SCHEMA.md           # 실제 개인화 raw → wiki → output 구조와 운영 규칙
+  raw/CONTEXT.md           # immutable source 계층의 scoped guidance
+  wiki/CONTEXT.md · index.md · log.md
+  output/CONTEXT.md        # 결과물 계층의 scoped guidance
 
 projects/                  # explicit preview-workspace/save-workspace에서만 생성
   PROJECT_CONTEXT.md       # 승인된 공통 brief

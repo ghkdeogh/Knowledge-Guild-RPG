@@ -26,12 +26,14 @@ __pycache__/
 members/*/raw/**
 !members/*/raw/**/
 !members/*/raw/**/README.md
+!members/*/raw/**/CONTEXT.md
 !members/*/raw/**/.gitkeep
 
 # Personal outputs stay local. Keep only structure documentation in Git.
 members/*/output/**
 !members/*/output/**/
 !members/*/output/**/README.md
+!members/*/output/**/CONTEXT.md
 !members/*/output/**/.gitkeep
 
 # Project raw sources and generated outputs follow the same local-only boundary.

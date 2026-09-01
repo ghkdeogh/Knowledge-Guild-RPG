@@ -1,210 +1,55 @@
-# Wiki³ Personal Wiki Initialization
+# Wiki³ Personal LLM Wiki Initialization
 
-현재 사용자의 프로필과 작업 방식에 맞는 개인 LLM Wiki를 **설계하고 실제 파일 구조로 구현**하세요.
+사용자가 “위키 초기화해줘”라고 요청하면, 프로필 온보딩 뒤의 개인화 LLM Wiki 초기화 흐름을 사용한다. 이 작업은 고정 scaffold를 만드는 일이 아니라 Karpathy LLM Wiki의 `raw → wiki → output` 패턴을 개인의 승인된 맥락으로 인스턴스화하는 일이다.
 
-초기화의 목적은 `raw/`, `wiki/`, `output/` 세 폴더만 만드는 것이 아닙니다. 사용자가 앞으로 수집할 자료, 축적할 지식, 만들 결과물이 자연스럽게 연결되는 개인 정보 구조를 만드는 것입니다.
+## Scope and privacy
 
-초기화는 반드시 다음 두 단계로 진행합니다.
+1. 현재 `member-id`를 확인하고 `WIKI_RULES.md`와 `prompts/llm-wiki.md`를 끝까지 읽는다.
+2. **오직** `members/{member-id}/PROFILE.md`와 `CONTEXT.md`만 읽는다. `projects/`, 다른 member, raw 원본은 읽지 않는다.
+3. PROFILE/CONTEXT 원문을 외부 제공자에 보낼 때는 사용자의 명시적 consent가 필요하다. consent가 없으면 보수적인 오프라인 제안만 만든다.
+4. PROFILE/CONTEXT가 `raw` 입력 유형, `wiki` 지식 영역, `output` 결과물 유형을 각각 하나 이상 뒷받침하지 못하면 범위 있는 질문을 한 번만 하고, 그래도 부족하면 `insufficient-context`로 끝낸다. 지원되지 않는 범용 폴더를 추측해 만들지 않는다.
 
-1. **개인화된 구조 제안과 사용자 확인**
-2. **승인된 구조의 실제 생성과 검증**
+## Preview before any write
 
-사용자의 확인을 받기 전에는 디렉터리나 파일을 생성하지 마세요.
+근거마다 PROFILE 또는 CONTEXT의 **section reference**를 붙여, 원문 문장을 불필요하게 재노출하지 않고 다음을 제안한다.
 
-## 0. 시작 전 확인
+- 원본 → compiled Wiki 지식 → 결과물 매핑과 각 흐름의 이유
+- lowercase, path-safe directory ID, 표시 이름, 목적, 예상 파일 예시
+- 정확한 전체 파일 계획과 digest
+- 근거가 부족하여 만들지 않은 영역
 
-1. 현재 사용자의 `member-id`를 확인합니다.
-2. `WIKI_RULES.md`를 읽습니다.
-3. `prompts/llm-wiki.md`를 처음부터 끝까지 읽습니다.
-4. `members/{member-id}/PROFILE.md`를 읽습니다.
-5. `members/{member-id}/CONTEXT.md`를 읽습니다.
-6. `projects/PROJECT_CONTEXT.md`를 읽습니다.
-7. `members/{member-id}/`에 이미 존재하는 파일과 디렉터리를 확인합니다.
+사용자는 digest를 명시적으로 승인해야 한다. `CONTEXT.md`에 이미 관리되는 `Wiki 운영 규칙` 블록이 있거나 이전 Wiki 구조가 있으면 keep/add/replace/remove migration diff를 먼저 제안한다. 기존 원본, wiki 페이지, `WIKI_INDEX.md`, `ACTIVITY_LOG.md`, harness를 자동 삭제·이동·덮어쓰지 않는다.
 
-`PROFILE.md`나 `CONTEXT.md`가 없거나 온보딩 내용이 구조를 설계하기에 부족하면 임의로 일반적인 구조를 만들지 말고 필요한 질문을 먼저 합니다.
+## Approved fresh structure
 
-다른 참여자의 디렉터리는 읽거나 구조 설계의 예시로 사용하지 마세요.
-
-## 1단계: 개인 작업 모델 추출
-
-`PROFILE.md`와 `CONTEXT.md`에서 다음을 구체적으로 추출합니다.
-
-### 수집할 원본
-
-- 어떤 종류의 자료를 반복적으로 가져올 가능성이 높은가
-- 직접 작성한 메모와 외부 자료를 어떻게 구분해야 하는가
-- 데이터, 기사, 논문, 이미지, 회의 기록 등 어떤 형식이 예상되는가
-
-### 축적할 지식
-
-- 반복해서 등장할 핵심 개념, 엔티티, 사건, 방법론은 무엇인가
-- 어떤 가설과 질문을 장기적으로 추적해야 하는가
-- 시간에 따라 상태가 바뀌거나 검증해야 하는 지식은 무엇인가
-
-### 만들 결과물
-
-- 보고서, 명세, 실험, 의사결정 자료 등 무엇을 만들 가능성이 높은가
-- Wiki의 어떤 지식이 각 결과물로 이어지는가
-
-### 사용자의 작업 방식
-
-- AI에게 기대하는 역할
-- 선호하는 분석·검증·의사결정 방식
-- 중요하게 생각하는 출처, 추적 가능성, 불확실성 표현 방식
-
-추출 결과마다 `PROFILE.md` 또는 `CONTEXT.md`의 근거가 되는 항목을 표시합니다. 사용자가 말하지 않은 관심사나 폴더를 임의로 추가하지 않습니다.
-
-## 2단계: 정보 흐름 설계
-
-다음 표를 먼저 작성합니다.
-
-| 수집할 원본 | 축적할 Wiki 지식 | 예상 결과물 | 설계 근거 |
-|---|---|---|---|
-| 예: 시장 데이터 | 지표와 측정 방법 | 지표 명세·실험 | PROFILE의 기술적 아이디어 |
-
-이 표를 기반으로 다음 세 계층의 하위 구조를 설계합니다.
+승인된 새 member에는 실제 근거가 있는 하위 폴더만 다음 구조로 만든다.
 
 ```text
 members/{member-id}/
-├─ PROFILE.md
-├─ CONTEXT.md
-├─ WIKI_SCHEMA.md
+├─ PROFILE.md                         # unchanged
+├─ CONTEXT.md                         # existing bytes preserved; managed rules block appended
+├─ WIKI_SCHEMA.md                     # provider-neutral, personalized exact tree/schema
 ├─ raw/
+│  ├─ CONTEXT.md                      # immutable source guidance
+│  └─ {evidence-backed-input-type}/
 ├─ wiki/
+│  ├─ CONTEXT.md                      # compiled knowledge guidance
+│  ├─ index.md
+│  ├─ log.md
+│  └─ {evidence-backed-knowledge-area}/
 └─ output/
+   ├─ CONTEXT.md                      # result guidance
+   └─ {evidence-backed-output-type}/
 ```
 
-### `raw/`
+Use `.gitkeep` only to retain approved empty subfolders. `raw/`, `output/`, PROFILE/CONTEXT and scoped CONTEXT guidance remain excluded from snapshots and public indexing; only public `wiki/` pages are eligible. Do not create `WIKI_INDEX.md`, `ACTIVITY_LOG.md`, `harnesses/*.SKILL.md`, or a generic README scaffold in this flow.
 
-사용자가 실제로 반복 수집할 가능성이 높은 원본 유형을 기준으로 하위 디렉터리를 제안합니다. 형식별 분류보다 사용자가 찾고 인제스트하기 쉬운 분류를 우선합니다.
+## Operations in WIKI_SCHEMA.md
 
-### `wiki/`
+- Raw sources are immutable and are the source of truth.
+- An ingest compiles one source into interlinked Wiki pages, updates `wiki/index.md`, and appends `wiki/log.md`.
+- A query reads the index first and files a durable result only with approval.
+- A lint pass looks for contradictions, staleness, orphans, missing links, and gaps.
+- Facts, personal opinions, hypotheses, and AI inferences are labeled distinctly.
 
-단순 자료 종류가 아니라 지속적으로 연결·갱신할 지식 단위를 기준으로 설계합니다. 대화형 인제스트 결과를 위한 `sources/`는 기본으로 포함합니다.
-
-### `output/`
-
-사용자가 실제로 만들 가능성이 높은 결과물 유형을 기준으로 설계합니다.
-
-각 하위 디렉터리에 대해 다음을 설명합니다.
-
-- 디렉터리 이름
-- 저장할 내용
-- 이 사용자에게 필요한 이유
-- 예상 파일 예시 1~3개
-- 어떤 `raw/` 또는 `wiki/` 영역과 연결되는지
-
-## 3단계: 구조 제안과 확인
-
-사용자에게 다음을 보여줍니다.
-
-1. 개인 작업 모델 요약
-2. `원본 → Wiki 지식 → 결과물` 매핑 표
-3. 제안하는 전체 디렉터리 트리
-4. 각 디렉터리의 목적
-5. 아직 확신할 수 없어 만들지 않은 영역
-
-마지막에 다음과 같이 확인합니다.
-
-> 이 구조로 실제 디렉터리와 초기 파일을 만들까요? 추가하거나 합치거나 이름을 바꿀 영역이 있으면 알려주세요.
-
-사용자가 수정 의견을 주면 구조를 다시 제안합니다. 명시적으로 승인받기 전에는 생성 단계로 넘어가지 않습니다.
-
-## 4단계: 승인된 구조 생성
-
-승인된 뒤 실제로 다음을 생성합니다.
-
-### 개인 스키마
-
-`members/{member-id}/WIKI_SCHEMA.md`
-
-`templates/wiki-schema.md`를 시작 형식으로 사용하되, 항목을 현재 사용자와 실제 승인된 구조에 맞게 채웁니다.
-
-다음을 기록합니다.
-
-- 개인 Wiki의 목적
-- `raw/`, `wiki/`, `output/`의 하위 구조와 역할
-- `원본 → 지식 → 결과물` 정보 흐름
-- 문서 배치와 이름 규칙
-- 이 사용자에게 중요한 사실·의견·가설·AI 추론 구분 방식
-- 인덱스, 로그, 출처 연결 규칙
-- 구조를 확장하거나 통합하는 기준
-
-이 파일은 이후 AI가 개인 Wiki를 작업할 때 `CONTEXT.md`와 함께 읽는 개인화된 운영 스키마입니다.
-
-### Raw 안내
-
-`members/{member-id}/raw/README.md`
-
-- 각 하위 디렉터리의 용도
-- 원본 불변 원칙
-- 개인 원본은 `.gitignore`로 제외되어 로컬에만 보관된다는 원칙
-- 파일명과 출처 메타데이터 규칙
-- 인제스트 대상에서 제외할 구조 관리 파일
-
-### Wiki 초기 파일
-
-`members/{member-id}/wiki/index.md`
-
-- Wiki의 목적
-- 생성한 주요 영역과 링크
-- 프로필에서 확인한 초기 관심사와 추적할 질문
-- 아직 소스가 없는 항목은 계획 또는 관심사임을 명시
-
-`members/{member-id}/wiki/log.md`
-
-- 초기화 날짜
-- 구조를 그렇게 설계한 이유
-- 생성한 영역
-- 아직 인제스트된 자료가 없다는 상태
-
-### Output 안내
-
-`members/{member-id}/output/README.md`
-
-- 각 결과물 디렉터리의 용도
-- Wiki 지식과 결과물의 연결 방식
-
-### 빈 디렉터리 추적
-
-승인된 빈 하위 디렉터리가 Git에서 사라지지 않도록 각 디렉터리에 `.gitkeep`을 생성하거나 의미 있는 `README.md`를 둡니다. `.gitkeep`과 구조 안내용 README는 인제스트 대상이 아님을 명시합니다.
-
-## 5단계: 기존 구조가 있을 때
-
-이 프롬프트를 다시 실행했을 때 기존 파일을 삭제하거나 덮어쓰지 마세요.
-
-1. 기존 `WIKI_SCHEMA.md`, 디렉터리, `index.md`, `log.md`를 읽습니다.
-2. 프로필과 실제 구조 사이의 차이를 보여줍니다.
-3. 유지, 추가, 통합, 이름 변경 후보를 나눠 제안합니다.
-4. 사용자의 승인을 받은 변경만 적용합니다.
-5. 구조 변경 내용을 `wiki/log.md`와 `WIKI_SCHEMA.md`에 반영합니다.
-
-기존 원본과 Wiki 문서를 새 위치로 이동해야 한다면 별도 승인을 받습니다. `raw/` 파일은 자동으로 이동하거나 이름을 바꾸지 않습니다.
-
-## 6단계: 완료 검증
-
-생성 후 다음을 실제 파일 시스템에서 확인합니다.
-
-- 승인된 모든 디렉터리가 존재하는가
-- 빈 디렉터리가 Git에서 추적 가능한가
-- `WIKI_SCHEMA.md`가 실제 구조와 일치하는가
-- `raw/README.md`, `wiki/index.md`, `wiki/log.md`, `output/README.md`가 존재하는가
-- `wiki/index.md`의 디렉터리 링크가 유효한가
-- `PROFILE.md`와 `CONTEXT.md`를 수정하지 않았는가
-- 다른 참여자의 공간을 수정하지 않았는가
-- 불필요한 일반 목적 디렉터리를 임의로 만들지 않았는가
-
-마지막으로 사용자에게 다음을 보여줍니다.
-
-1. 실제 생성된 전체 트리
-2. 개인화 설계의 핵심 이유
-3. 검증 결과
-4. 첫 자료를 넣을 권장 `raw/` 위치
-5. `prompts/ingest.md`로 첫 인제스트를 시작하는 요청문
-
-## 균형 원칙
-
-- 세부 구조를 전혀 만들지 않고 `raw/`, `wiki/`, `output/`만 생성한 상태는 초기화 완료로 취급하지 않습니다.
-- 반대로 프로필에 근거가 없는 범용 폴더를 가능한 경우를 상상해서 대량 생성하지 않습니다.
-- 프로필에서 반복 가능성이 분명한 영역은 초기 구조에 만들고, 불확실한 영역은 제안서에 보류 항목으로 기록합니다.
-- 구조는 출발점이며, 실제 자료와 질문이 쌓이면 사용자 승인 아래 발전할 수 있습니다.
+Saving is atomic: validate every path, reserved name, collision, and symlink boundary before writing; on failure leave no partial files. `PROFILE.md` is never modified.

@@ -278,7 +278,7 @@ export async function advanceProfileOnboarding(current, input = {}, options = {}
     if (input.expectedDigest !== state.approvedDigest) fail('승인한 digest와 저장 요청이 일치하지 않습니다.', 'preview-mismatch')
     const preview = previewProfileOnboarding({ ...state, phase: 'preview' })
     await savePreview(preview, repoRoot)
-    return { state: session('saved', { ...state }), events: [event('files.written', { files: preview.files.map(file => file.path) }), event('session.completed', { phase: 'saved' })], result: { files: preview.files.map(file => file.path) } }
+    return { state: session('saved', { ...state }), events: [event('files.written', { files: preview.files.map(file => file.path) }), event('personal-wiki-init.next-step', { command: `node scripts/personal-wiki-init-cli.mjs --repo-root <repository-root>`, request: { action: 'start', memberId: state.memberId }, note: 'PROFILE.md와 CONTEXT.md 기반 개인화 Wiki 구조를 preview한 뒤 승인해 생성합니다.' }), event('session.completed', { phase: 'saved' })], result: { files: preview.files.map(file => file.path) } }
   }
   fail('이미 저장이 완료된 세션입니다.', 'session-complete')
 }
