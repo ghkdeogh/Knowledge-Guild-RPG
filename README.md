@@ -77,9 +77,9 @@ node scripts/release-quickstart.mjs --target <new-absolute-directory-outside-thi
 
 `--target`은 parent가 이미 존재하는 **아직 존재하지 않는 저장소 밖 절대 경로**여야 합니다. 상대 경로, 현재 checkout 안의 경로(또는 그곳으로 향하는 symlink/junction), 이미 존재하는 경로는 fail-closed로 거부됩니다.
 
-## 첫 Wiki 기록 남기기
+## Advanced: shared workspace Wiki scaffold
 
-웹에서 공개 기록이 없으면 건물이나 예제 member 없이 아래 CLI 시작 명령만 보입니다. 첫 입력은 아이디어, 조사, 문제의식, 실험 기록 또는 자유 프로젝트 메모 어느 것이든 됩니다. `analyze` 뒤에는 실제 blueprint로 `preview`를 확인하고, digest를 넣은 `save`를 승인해 실행하세요. 기본 경로는 요청한 member의 개인 Wiki만 만듭니다. 공개 개인 Wiki 기록을 남긴 다음 snapshot build에서 관찰 흐름과 member가 마을에 투영됩니다.
+공유 project scaffold가 명시적으로 필요할 때만 아래 legacy/advanced CLI를 사용합니다. `analyze` 뒤에는 `preview-workspace`를 확인하고, digest를 넣은 `save-workspace`를 승인해 실행하세요. 개인 Wiki의 기본 경로는 아래 프로필 온보딩과 개인화 LLM Wiki 초기화입니다.
 
 ### 개인 프로필 온보딩
 
@@ -95,7 +95,7 @@ node scripts/release-quickstart.mjs --target <new-absolute-directory-outside-thi
 '@ | node scripts/personal-wiki-init-cli.mjs
 ```
 
-preview 후 같은 세션에서 `{"action":"approve","expectedDigest":"<digest>"}`와 별도 `save`를 보냅니다. PROFILE/CONTEXT를 OpenAI Responses 제공자에 보낼 수 있는 경우에만 시작 요청에 `"providerApproved":true`를 넣으세요. 기존 scaffold나 개인 구조가 있으면 삭제·이동하지 않고 keep/add/replace/remove migration diff만 보여 주며 자동 저장하지 않습니다. 기존 `wiki-architect`의 personal `preview/save`는 첫 공개 기록을 위한 legacy/advanced 경로이며, 프로필 뒤 기본 초기화 경로가 아닙니다.
+preview 후 같은 세션에서 `{"action":"approve","expectedDigest":"<digest>"}`와 별도 `save`를 보냅니다. PROFILE/CONTEXT를 OpenAI Responses 제공자에 보낼 수 있는 경우에만 시작 요청에 `"providerApproved":true`를 넣으세요. 기존 scaffold나 개인 구조가 있으면 keep/add/replace migration diff를 먼저 보여 줍니다. `migrationApproved:true`로 승인하면 preview에 선언된 `WIKI_SCHEMA.md`·`wiki/index.md`·관리 규칙 블록만 recoverable backup과 함께 교체하고, 나머지는 추가만 합니다. `WIKI_INDEX.md`, `ACTIVITY_LOG.md`, harness, raw/wiki/output 사용자 내용은 삭제·이동하지 않습니다. 기존 `wiki-architect`의 personal `preview/save`는 더 이상 사용할 수 없으며 프로필 뒤 기본 초기화 경로는 personal initializer입니다.
 
 ## CLI 사용법
 
@@ -117,7 +117,7 @@ printf '%s\n' '{"statement":"첫 Wiki 기록: 고객 피드백을 관찰하며 �
 
 PowerShell은 작은따옴표 안의 JSON을 그대로 전달할 수 있고, 일반 shell은 `printf`를 쓰면 줄바꿈을 명확히 보낼 수 있습니다. 결과의 `result.blueprint`를 다음 요청의 `blueprint`에 사용하세요.
 
-### preview — 승인 전 파일 계획 보기
+### preview-workspace — 승인 전 shared workspace 계획 보기
 
 아래는 방금 `analyze`한 실제 blueprint를 `preview.json`으로 만들고, 쓰지 않을 파일 계획을 보는 PowerShell 예시입니다. `memberId`와 표시 이름은 본인이 확인한 값으로 바꾸세요.
 
@@ -128,24 +128,24 @@ $events = '{"statement":"첫 Wiki 기록: 고객 피드백을 관찰하며 떠�
 $blueprint = ($events | Where-Object { $_.type -eq 'result' }).result.blueprint
 $previewRequest = @{ blueprint = $blueprint; identity = @{ memberId = 'demo-author'; displayName = 'Demo Author'; workingContext = '초안 검토' } }
 $previewRequest | ConvertTo-Json -Depth 12 | Set-Content .\preview.json -Encoding utf8
-node scripts/wiki-architect-cli.mjs --command preview --input .\preview.json
+node scripts/wiki-architect-cli.mjs --command preview-workspace --input .\preview.json
 ```
 
 `preview` 결과의 `result.preview.digest`는 다음 저장 요청에 반드시 일치해야 하는 확인값입니다. 파일을 아직 만들지 않습니다.
 
-### save — 승인된 계획 적용
+### save-workspace — 승인된 shared workspace 계획 적용
 
 다음은 preview digest를 넣어 승인된 계획을 새 로컬 폴더에 적용하는 실제 PowerShell 예시입니다. `$localRoot`는 **쓰기 허용한 폴더**로 바꾸세요.
 
 ```powershell
-$previewEvents = node scripts/wiki-architect-cli.mjs --command preview --input .\preview.json |
+$previewEvents = node scripts/wiki-architect-cli.mjs --command preview-workspace --input .\preview.json |
   ForEach-Object { $_ | ConvertFrom-Json }
 $digest = ($previewEvents | Where-Object { $_.type -eq 'result' }).result.preview.digest
 $saveRequest = $previewRequest.Clone()
 $saveRequest.expectedDigest = $digest
 $saveRequest | ConvertTo-Json -Depth 12 | Set-Content .\save.json -Encoding utf8
 $localRoot = Join-Path $HOME 'knowledge-guild-cli-demo'
-node scripts/wiki-architect-cli.mjs --command save --repo-root $localRoot --input .\save.json
+node scripts/wiki-architect-cli.mjs --command save-workspace --repo-root $localRoot --input .\save.json
 ```
 
 digest가 다르거나 기존 member root와 충돌하면 저장하지 않습니다. 기본 저장은 기존 `projects/`가 있어도 project 파일을 만들거나 바꾸지 않습니다. 경로 이동(`..`), 예약된 private/secrets 경로, 허용하지 않은 경로도 거부합니다.

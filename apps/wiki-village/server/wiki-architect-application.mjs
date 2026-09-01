@@ -1,5 +1,5 @@
 import { analyzeProject } from './project-wiki-architect.mjs'
-import { previewPersonal, previewWorkspace, savePersonal, saveWorkspace } from './onboarding.mjs'
+import { previewWorkspace, saveWorkspace } from './onboarding.mjs'
 
 const event = (type, data = {}) => ({ type, at: 'session', ...data })
 
@@ -16,16 +16,17 @@ export async function runWikiArchitect(command, payload = {}, options = {}) {
       events.push(event('approval.required', { reason: '승인 전에는 source 또는 compiled Wiki 파일을 만들지 않습니다.' }), event('session.completed', { phase: 'review' }))
       return { events, result }
     }
-    if (command === 'preview' || command === 'preview-workspace') {
-      const preview = command === 'preview' ? previewPersonal(payload) : previewWorkspace(payload)
+    if (command === 'preview' || command === 'save') throw Object.assign(new Error('개인 Wiki 기본 초기화는 personal-wiki-init-cli를 사용해 주세요.'), { status: 410, code: 'personal-wiki-init-required', nextCommand: 'node scripts/personal-wiki-init-cli.mjs' })
+    if (command === 'preview-workspace') {
+      const preview = previewWorkspace(payload)
       events.push(event('files.planned', { files: preview.files.map(file => file.path), digest: preview.digest }), event('approval.required', { digest: preview.digest }), event('session.completed', { phase: 'preview' }))
       return { events, result: { preview } }
     }
-    if (command === 'save' || command === 'save-workspace') {
-      const preview = command === 'save' ? previewPersonal(payload) : previewWorkspace(payload)
+    if (command === 'save-workspace') {
+      const preview = previewWorkspace(payload)
       events.push(event('files.planned', { files: preview.files.map(file => file.path), digest: preview.digest }))
       if (payload.expectedDigest !== preview.digest) throw Object.assign(new Error('Preview mismatch'), { status: 400, code: 'preview-mismatch' })
-      const state = command === 'save' ? await savePersonal(payload, options) : await saveWorkspace(payload, options)
+      const state = await saveWorkspace(payload, options)
       events.push(event('files.written', { files: preview.files.map(file => file.path) }), event('wiki.indexed', { phase: state.phase }), event('session.completed', { phase: state.phase }))
       return { events, result: { state } }
     }

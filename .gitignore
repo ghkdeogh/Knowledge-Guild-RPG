@@ -53,6 +53,7 @@ members/*/private/**
 members/*/secrets/**
 members/*/PROFILE.private.md
 members/*/CONTEXT.private.md
+members/*/.wiki-migration-backup/
 .vercel
 .env*
 !.env.example

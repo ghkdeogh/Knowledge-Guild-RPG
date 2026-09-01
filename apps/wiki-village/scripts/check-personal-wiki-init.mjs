@@ -48,23 +48,33 @@ const insufficient = await startPersonalWikiInit({ memberId: 'empty' }, { repoRo
 expect(insufficient.result.status === 'insufficient-context' && await absent(join(root, 'members', 'empty', 'WIKI_SCHEMA.md')), 'insufficient input wrote files')
 
 let providerCalls = 0
-const fakeProvider = { responses: { create: async () => { providerCalls += 1; return { output_text: JSON.stringify({ raw: [{ id: 'papers', label: 'Papers', purpose: 'sources', evidence: ['PROFILE:researcher profile'], links: ['concepts'] }], wiki: [{ id: 'concepts', label: 'Concepts', purpose: 'knowledge', evidence: ['PROFILE:researcher profile'], links: ['reports'] }], output: [{ id: 'reports', label: 'Reports', purpose: 'result', evidence: ['PROFILE:researcher profile'], links: [] }] }) } } } }
+const proof = [{ ref: 'PROFILE:나의 맥락 요약', span: '연구 논문과 데이터로 실험을 조사하고 조사 보고서를 만든다.' }]
+const fakeProvider = { responses: { create: async () => { providerCalls += 1; return { output_text: JSON.stringify({ raw: [{ id: 'papers', label: '연구 논문', purpose: '연구 논문 원본', evidence: proof, links: ['concepts'] }], wiki: [{ id: 'concepts', label: '연구 개념', purpose: '연구 개념 지식', evidence: proof, links: ['reports'] }], output: [{ id: 'reports', label: '조사 보고서', purpose: '조사 보고서 결과', evidence: proof, links: [] }] }) } } } }
 const noConsent = await startPersonalWikiInit({ memberId: 'researcher' }, { repoRoot: root, responsesClient: fakeProvider, providerConfig: { apiKey: 'x' } })
 expect(providerCalls === 0 && noConsent.result.providerStatus === 'not-consented', 'provider ran without consent')
 const consent = await startPersonalWikiInit({ memberId: 'researcher', providerApproved: true }, { repoRoot: root, responsesClient: fakeProvider, providerConfig: { apiKey: 'x' } })
 expect(providerCalls === 1 && consent.result.mode === 'llm-suggestion' && consent.result.preview.plan.raw[0].links[0] === 'concepts', 'consented provider map was not used safely')
 expect(noConsent.result.preview.digest !== consent.result.preview.digest, 'mode-specific preview digest was not bound to its plan')
-const unsafeProvider = { responses: { create: async () => ({ output_text: JSON.stringify({ raw: [{ id: '../escape', label: 'Bad', purpose: 'bad', evidence: ['PROFILE:researcher profile'], links: ['concepts'] }], wiki: [{ id: 'concepts', label: 'Concepts', purpose: 'knowledge', evidence: ['PROFILE:researcher profile'], links: ['reports'] }], output: [{ id: 'reports', label: 'Reports', purpose: 'result', evidence: ['PROFILE:researcher profile'], links: [] }] }) }) } }
+const unsafeProvider = { responses: { create: async () => ({ output_text: JSON.stringify({ raw: [{ id: 'music-archive', label: '음악 보관함', purpose: '음악 자료 원본', evidence: proof, links: ['concepts'] }], wiki: [{ id: 'concepts', label: '연구 개념', purpose: '연구 개념 지식', evidence: proof, links: ['reports'] }], output: [{ id: 'reports', label: '조사 보고서', purpose: '조사 보고서 결과', evidence: proof, links: [] }] }) }) } }
 const providerFallback = await startPersonalWikiInit({ memberId: 'researcher', providerApproved: true }, { repoRoot: root, responsesClient: unsafeProvider, providerConfig: { apiKey: 'x' } })
 expect(providerFallback.result.mode === 'offline-conservative' && !providerFallback.result.preview.files.some(file => file.path.includes('escape')), 'unsafe provider path was accepted')
 
 const legacy = await fixture('legacy', profile('legacy', '연구 논문과 데이터로 실험을 조사하고 조사 보고서를 만든다.'), context('연구 논문과 데이터로 실험을 조사하고 조사 보고서를 만든다.'))
-await mkdir(join(legacy, 'harnesses')); await writeFile(join(legacy, 'WIKI_INDEX.md'), 'legacy')
+await mkdir(join(legacy, 'harnesses')); await mkdir(join(legacy, 'wiki'), { recursive: true }); await writeFile(join(legacy, 'WIKI_INDEX.md'), 'legacy'); await writeFile(join(legacy, 'ACTIVITY_LOG.md'), 'legacy log'); await writeFile(join(legacy, 'WIKI_SCHEMA.md'), 'old schema'); await writeFile(join(legacy, 'wiki', 'index.md'), 'old index')
 const migration = await startPersonalWikiInit({ memberId: 'legacy' }, { repoRoot: root })
-expect(migration.result.migration.required && migration.result.migration.changes.some(change => change.path === 'WIKI_INDEX.md'), 'legacy scaffold did not become migration preview')
+expect(migration.result.migration.required && migration.result.migration.actions.some(change => change.path === 'WIKI_INDEX.md' && change.action === 'keep') && migration.result.migration.actions.some(change => change.path === 'WIKI_SCHEMA.md' && change.action === 'replace'), 'legacy scaffold did not become migration preview')
 const migrationApproved = await advancePersonalWikiInit(migration.state, { action: 'approve', expectedDigest: migration.result.preview.digest, migrationApproved: true }, { repoRoot: root })
-await savePersonalWikiInit(migrationApproved.state, { action: 'save', expectedDigest: migration.result.preview.digest }, { repoRoot: root }).then(() => fail('migration save must fail closed'), error => expect(error.code === 'migration-manual-required', 'wrong migration failure'))
-expect(await access(join(legacy, 'WIKI_INDEX.md')).then(() => true), 'legacy file was deleted')
+await savePersonalWikiInit(migrationApproved.state, { action: 'save', expectedDigest: migration.result.preview.digest }, { repoRoot: root })
+const backup = join(legacy, '.wiki-migration-backup', migration.result.preview.digest)
+expect(await readFile(join(legacy, 'WIKI_INDEX.md'), 'utf8') === 'legacy' && await readFile(join(legacy, 'ACTIVITY_LOG.md'), 'utf8') === 'legacy log' && await access(join(legacy, 'harnesses')).then(() => true), 'legacy extras changed')
+expect(await readFile(join(backup, 'WIKI_SCHEMA.md'), 'utf8') === 'old schema' && await readFile(join(backup, 'wiki', 'index.md'), 'utf8') === 'old index', 'migration backups missing')
+
+const migrationStale = await fixture('migration-stale', profile('migration-stale', '연구 논문과 데이터로 실험을 조사하고 조사 보고서를 만든다.'), context('연구 논문과 데이터로 실험을 조사하고 조사 보고서를 만든다.'))
+await writeFile(join(migrationStale, 'WIKI_SCHEMA.md'), 'schema before preview')
+const migrationStaleStart = await startPersonalWikiInit({ memberId: 'migration-stale' }, { repoRoot: root }); await writeFile(join(migrationStale, 'WIKI_SCHEMA.md'), 'schema changed after preview')
+const migrationStaleApproved = await advancePersonalWikiInit(migrationStaleStart.state, { action: 'approve', expectedDigest: migrationStaleStart.result.preview.digest, migrationApproved: true }, { repoRoot: root })
+await savePersonalWikiInit(migrationStaleApproved.state, { action: 'save', expectedDigest: migrationStaleStart.result.preview.digest }, { repoRoot: root }).then(() => fail('stale migration must fail'), error => expect(error.code === 'preview-mismatch', 'stale migration did not fail closed'))
+expect(await absent(join(migrationStale, 'raw')) && await readFile(join(migrationStale, 'WIKI_SCHEMA.md'), 'utf8') === 'schema changed after preview', 'stale migration rolled forward partially')
 
 const collision = await fixture('collision', profile('collision', '연구 논문과 데이터로 실험을 조사하고 조사 보고서를 만든다.'), context('연구 논문과 데이터로 실험을 조사하고 조사 보고서를 만든다.'))
 const collisionStart = await startPersonalWikiInit({ memberId: 'collision' }, { repoRoot: root }); await writeFile(join(collision, 'WIKI_SCHEMA.md'), 'racing collision')
@@ -80,7 +90,7 @@ expect(await absent(join(stale, 'raw')), 'stale preview left partial writes')
 
 const outside = join(root, 'outside'); await mkdir(outside); const linked = join(root, 'members', 'linked'); await symlink(outside, linked, 'junction').catch(() => null)
 if (await access(linked).then(() => true).catch(() => false)) await startPersonalWikiInit({ memberId: 'linked' }, { repoRoot: root }).then(() => fail('symlink member accepted'), error => expect(error.code === 'unsafe-path', 'symlink did not fail closed'))
-expect(classifyWikiPath('members/researcher/raw/papers/a.md') === null && classifyWikiPath('members/researcher/output/reports/a.md') === null && classifyWikiPath('members/researcher/wiki/index.md')?.memberId === 'researcher', 'public status allowlist leaked private layers')
+expect(classifyWikiPath('members/researcher/raw/papers/a.md') === null && classifyWikiPath('members/researcher/output/reports/a.md') === null && classifyWikiPath('members/researcher/.wiki-migration-backup/digest/WIKI_SCHEMA.md') === null && classifyWikiPath('members/researcher/wiki/index.md')?.memberId === 'researcher', 'public status allowlist leaked private layers')
 expect(parseProfileProviderEnv('OPENAI_MODEL=x\nEVIL=y').OPENAI_MODEL === 'x' && !(await loadProfileProviderConfig({ env: {}, envPath: join(root, 'missing.env') })).apiKey, 'provider env parsing is unsafe')
 expect(await readFile(join(root, 'projects', 'private-marker.md'), 'utf8') === 'must remain unread and unchanged' && await readFile(join(spectator, 'PROFILE.md'), 'utf8') === profile('spectator', '창작 참고 자료와 초안을 보관하고 결과물을 만든다.'), 'initializer changed another scope')
 console.log(JSON.stringify({ ok: true, root }))

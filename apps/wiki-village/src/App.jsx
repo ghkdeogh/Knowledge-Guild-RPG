@@ -145,9 +145,9 @@ function MemberDetail({ member, repository, onClose }) {
 }
 
 function EmptyState({ flow }) {
-  const analyzeCommand = "'{\"statement\":\"첫 Wiki 기록: 해결하고 싶은 문제와 떠오른 생각을 적습니다.\"}' | node scripts/wiki-architect-cli.mjs --command analyze"
+  const initializeCommand = "'{\"action\":\"start\",\"memberId\":\"<member-id>\"}' | node scripts/personal-wiki-init-cli.mjs"
   const insufficient = flow?.status === 'insufficient' && flow.evidencePaths?.length
-  return <main className="empty-state"><section><small>CLI-FIRST PERSONAL WIKI</small><h1>{insufficient ? '공개 Wiki 기록은 있으나 흐름을 판단할 근거가 부족합니다.' : '아직 흐름을 판단할 공개 Wiki 기록이 없습니다.'}</h1><p>{insufficient ? '기록 부재나 관점 차이를 추정하지 않습니다. 추가 기록이 쌓이면 다음 snapshot에서 다시 관찰합니다.' : 'CLI에서 첫 기록 과정을 시작하세요. 기본 preview/save는 한 member의 개인 Wiki만 만듭니다. 아이디어, 조사, 문제의식, 실험 기록 어느 것이든 시작점이 될 수 있습니다.'}</p><code>{analyzeCommand}</code></section></main>
+  return <main className="empty-state"><section><small>CLI-FIRST PERSONAL WIKI</small><h1>{insufficient ? '공개 Wiki 기록은 있으나 흐름을 판단할 근거가 부족합니다.' : '아직 흐름을 판단할 공개 Wiki 기록이 없습니다.'}</h1><p>{insufficient ? '기록 부재나 관점 차이를 추정하지 않습니다. 추가 기록이 쌓이면 다음 snapshot에서 다시 관찰합니다.' : '프로필 온보딩 뒤 개인화 Wiki 초기화를 시작하세요. PROFILE/CONTEXT 근거로 raw → wiki → output 구조를 preview하고 승인한 뒤 만듭니다.'}</p><code>{initializeCommand}</code></section></main>
 }
 
 function App() {

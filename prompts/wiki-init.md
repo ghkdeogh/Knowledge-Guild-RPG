@@ -18,7 +18,7 @@
 - 정확한 전체 파일 계획과 digest
 - 근거가 부족하여 만들지 않은 영역
 
-사용자는 digest를 명시적으로 승인해야 한다. `CONTEXT.md`에 이미 관리되는 `Wiki 운영 규칙` 블록이 있거나 이전 Wiki 구조가 있으면 keep/add/replace/remove migration diff를 먼저 제안한다. 기존 원본, wiki 페이지, `WIKI_INDEX.md`, `ACTIVITY_LOG.md`, harness를 자동 삭제·이동·덮어쓰지 않는다.
+사용자는 digest를 명시적으로 승인해야 한다. `CONTEXT.md`에 이미 관리되는 `Wiki 운영 규칙` 블록이 있거나 이전 Wiki 구조가 있으면 keep/add/replace/remove migration diff를 먼저 제안한다. 별도의 migration 승인 뒤에도 preview에 선언된 `WIKI_SCHEMA.md`, `wiki/index.md`, 관리 규칙 블록만 교체할 수 있으며, 기존 원본은 `.wiki-migration-backup/<digest>/`에 복구 가능하게 보관한다. 기존 원본, 다른 wiki 페이지, `WIKI_INDEX.md`, `ACTIVITY_LOG.md`, harness를 자동 삭제·이동·덮어쓰지 않는다.
 
 ## Approved fresh structure
 

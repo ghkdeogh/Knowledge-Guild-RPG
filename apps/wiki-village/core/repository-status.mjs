@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 
 const run = promisify(execFile)
-const ignored = /(^|\/)(raw|output|private|secrets|\.git|node_modules)(\/|$)|(^|\/)CONTEXT(?:\.private)?\.md$|\.env/i
+const ignored = /(^|\/)(raw|output|private|secrets|\.wiki-migration-backup|\.git|node_modules)(\/|$)|(^|\/)CONTEXT(?:\.private)?\.md$|\.env/i
 const memberPath = /^members\/([a-z0-9-]+)\/(?:wiki\/|harnesses\/|WIKI_INDEX\.md$|ACTIVITY_LOG\.md$)/
 const projectPath = /^(projects\/(?:wiki\/|harnesses\/|PROJECT_CONTEXT\.md$|WIKI_BLUEPRINT\.md$|WIKI_INDEX\.md$|ACTIVITY_LOG\.md$)|decisions\/|synthesis\/)/
 export const classifyWikiPath = path => {

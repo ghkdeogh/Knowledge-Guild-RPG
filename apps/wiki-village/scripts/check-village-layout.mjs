@@ -4,7 +4,7 @@ import { homeSpots, memberHomeIsClearOfPersistentUi, memberHomePosition } from '
 import { canRenderVillage, memberPublicChanges, publicFlowDocuments, publicMemberDocuments, publicMemberSkills } from '../src/village-view.js'
 
 const root = resolve(import.meta.dirname, '..'); const [app, css, vite] = await Promise.all([readFile(resolve(root, 'src/App.jsx'), 'utf8'), readFile(resolve(root, 'src/styles.css'), 'utf8'), readFile(resolve(root, 'vite.config.js'), 'utf8')]); const expect = (value, message) => { if (!value) throw new Error(message) }
-expect(app.includes('아직 흐름을 판단할 공개 Wiki 기록이 없습니다.') && app.includes('첫 Wiki 기록') && app.includes('--command analyze'), 'Empty snapshot does not show the minimal first-record CLI command')
+expect(app.includes('아직 흐름을 판단할 공개 Wiki 기록이 없습니다.') && app.includes('개인화 Wiki 초기화를 시작하세요') && app.includes('personal-wiki-init-cli.mjs'), 'Empty snapshot does not show the personalized initialization command')
 expect(app.includes('canRenderVillage(snapshot)') && app.includes('FlowBoard') && app.includes('관찰된 프로젝트 흐름') && app.includes('저장소 상태 새로고침'), 'Observed-flow first screen is incomplete')
 expect(app.includes('publicFlowDocuments') && app.includes('공통 관점') && app.includes('의견 차이') && app.includes('지식 공백') && app.includes('다음 조사 질문'), 'Flow detail omits required evidence-grounded sections')
 expect(app.includes("fetch('/api/repository-status', { method: 'POST' })") && app.includes('refreshInFlight.current') && app.includes('disabled={isRefreshing}') && app.includes('role="status" aria-live="polite"'), 'Serialized repository refresh or its status announcement is missing')
