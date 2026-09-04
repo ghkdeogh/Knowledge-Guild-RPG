@@ -42,6 +42,16 @@ UI는 `http://localhost:5173`에서 확인합니다. agent 대신 직접 실행�
 
 `raw/`는 불변 원본, `wiki/`는 LLM이 컴파일·연결하는 지식, `output/`은 Wiki 근거에서 만든 결과물입니다. 실제 하위 폴더는 프로필과 맥락의 근거가 있을 때만 제안됩니다. `WIKI_INDEX.md`, `ACTIVITY_LOG.md`, `harnesses/`, `*.SKILL.md`는 이 개인 초기화 흐름에서 만들지 않습니다.
 
+## raw 인제스트
+
+raw에 글을 저장한 뒤 agent에게 다음처럼 요청하세요.
+
+```text
+방금 raw/에 저장한 글이 있어. 인제스트해줘.
+```
+
+agent는 raw를 수정하지 않고 분석을 먼저 보여 준 뒤, 왜 캡처했는지·현재 일과의 연결·해보고 싶은 일을 한 질문씩 묻습니다. 세 답변 뒤 Wiki 반영 preview를 승인하면 source/entity/concept와 `wiki/index.md`·`wiki/log.md`를 갱신합니다. raw는 Git이나 수정 대상이 아닙니다.
+
 ## 주요 명령
 
 아래 명령은 `apps/wiki-village`에서 실행합니다.

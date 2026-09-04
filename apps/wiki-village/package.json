@@ -19,6 +19,7 @@
     "test:profile-onboarding": "node scripts/check-profile-onboarding.mjs",
     "profile-onboarding": "node scripts/profile-onboarding-cli.mjs",
     "test:personal-wiki-init": "node scripts/check-personal-wiki-init.mjs",
+    "test:ingest-contract": "node scripts/check-ingest-contract.mjs",
     "personal-wiki-init": "node scripts/personal-wiki-init-cli.mjs",
     "test:provider-smoke": "node scripts/check-provider-smoke.mjs",
     "quickstart": "node scripts/release-quickstart.mjs --temp",
